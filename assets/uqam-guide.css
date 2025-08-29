@@ -96,9 +96,16 @@ body > p:nth-of-type(3) {
 /* Line 4: the long French title */
 body > p:nth-of-type(4) {
   margin:.4rem 0 .2rem;
-  font-family: Georgia, "Times New Roman", Times, serif;
-  font-weight:700; line-height:1.25;
+  /* use the same font as the rest of the site */
+  font-family: inherit;
+  /* UQAM rubric blue */
+  color: var(--uqam-blue);
+  /* keep it prominent but mobile-friendly */
+  font-weight: 800;                  /* or 700 if you prefer lighter */
+  line-height: 1.25;
   font-size: clamp(1.2rem, 1rem + 2.6vw, 2rem);
+  text-wrap: balance;                 /* safe no-op if unsupported */
+  hyphens: auto;
 }
 
 /* Line 5: date */
