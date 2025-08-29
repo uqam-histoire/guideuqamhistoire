@@ -116,3 +116,15 @@ body > p:nth-of-type(5) {
 /* ToC spacing after the masthead */
 details.toc { margin: .75rem 0 1.25rem; }
 
+/* Boutons de la topbar */
+.doc-actions .btn {
+  display:inline-block; padding:.45rem .7rem; border-radius:.5rem;
+  border:1px solid #cfd9e3; background:#f6f8fa; text-decoration:none;
+  margin-left:.35rem;
+}
+
+/* Détails/ToC replié par défaut, propre sur mobile */
+details.toc { margin:.75rem 0 1.25rem; border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#fafbfc; }
+details.toc summary { cursor:pointer; font-weight:600; color:var(--uqam-blue); }
+
+
