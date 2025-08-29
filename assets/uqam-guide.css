@@ -1,0 +1,29 @@
+:root { --uqam-blue:#005DAA; --maxw:48rem; }
+html { scroll-behavior:smooth; }
+body { margin:0 auto; max-width:var(--maxw); padding:1rem; font:16px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+h1,h2,h3 { color:var(--uqam-blue); line-height:1.25; margin-top:2rem; }
+h1 { font-size:1.8rem; } h2 { font-size:1.4rem; } h3 { font-size:1.2rem; }
+p, li { hyphens:auto; }
+a { color: var(--uqam-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Tables (e.g., barème) */
+table { width:100%; border-collapse:collapse; display:block; overflow-x:auto; }
+th, td { border:1px solid #ddd; padding:.5rem; vertical-align:top; }
+th { background:#f6f8fa; text-align:left; position:sticky; top:0; }
+
+/* Footnotes as compact endnotes */
+section.footnotes, .footnotes { border-top:2px solid #eee; margin-top:3rem; padding-top:1rem; }
+sup.note-ref a { text-decoration:none; }
+
+/* Blockquotes / callouts (if present) */
+blockquote { border-left:4px solid #cfd9e3; margin:1rem 0; padding:.5rem 1rem; background:#f8fbff; }
+
+/* Lists in bibliography examples: hanging indent */
+.bib-entry { padding-left:1.25rem; text-indent:-1.25rem; }
+
+/* Print styles (if someone prints the HTML) */
+@media print {
+  a[href^="http"]:after { content:" (" attr(href) ")"; font-size:90%; }
+  body { color:#000; }
+}
