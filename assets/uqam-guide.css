@@ -27,3 +27,41 @@ blockquote { border-left:4px solid #cfd9e3; margin:1rem 0; padding:.5rem 1rem; b
   a[href^="http"]:after { content:" (" attr(href) ")"; font-size:90%; }
   body { color:#000; }
 }
+/* --- Header & title tuning for long French titles --- */
+.site-header { display:flex; flex-wrap:wrap; align-items:flex-start; gap:.75rem; margin-bottom:1rem; }
+.site-header h1 {
+  flex: 1 1 100%;
+  margin: .25rem 0 .25rem;
+  line-height: 1.22;
+  /* Wrap long titles nicely on phones */
+  text-wrap: balance;            /* safe to ignore if unsupported */
+  hyphens: auto;
+  word-break: normal;
+  /* Responsive size: readable on mobile, not huge on desktop */
+  font-size: clamp(1.15rem, 1rem + 2.2vw, 1.9rem);
+}
+.doc-actions { flex: 0 0 auto; }
+
+/* “Version mobile” pill */
+.badge {
+  display:inline-block;
+  margin-left:.5rem;
+  padding:.15rem .5rem;
+  border-radius:999px;
+  background: var(--uqam-blue);
+  color:#fff;
+  font-size:.75rem;
+  vertical-align: middle;
+}
+
+/* Button next to header */
+.doc-actions .btn {
+  display:inline-block;
+  padding:.5rem .75rem;
+  border-radius:.5rem;
+  border:1px solid #cfd9e3;
+  background:#f6f8fa;
+}
+
+/* Tweak ToC spacing a touch */
+details.toc { margin: .75rem 0 1.25rem; }
