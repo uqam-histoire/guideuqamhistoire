@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install converters & fonts (Times New Roman)
+      # Install tools and fonts (Times New Roman)
       - name: Install converters & fonts
         run: |
           sudo apt-get update
@@ -30,18 +30,12 @@ jobs:
           sudo fc-cache -f -v
           fc-list | grep -i "Times New Roman" || true
 
-      - name: Setup Node (for Mammoth)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Prepare dist and copy assets
+        run: |
+          mkdir -p dist/assets
+          cp -r assets/* dist/assets/ || true
 
-      - name: Install Mammoth
-        run: npm install -g mammoth
-
-      - name: Prepare dist/
-        run: mkdir -p dist
-
-      # DOCX ➜ PDF (desktop), embed fonts & bookmarks
+      # DOCX → PDF (desktop), embed fonts & bookmarks
       - name: Convert DOCX to PDF
         run: |
           libreoffice --headless \
@@ -49,41 +43,14 @@ jobs:
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
 
-      # DOCX ➜ HTML (mobile): Mammoth first, Pandoc fallback if empty
-      - name: Convert DOCX to HTML (Mammoth → Pandoc fallback)
+      # DOCX → HTML (mobile) with Pandoc (full, valid HTML)
+      - name: Convert DOCX to HTML (Pandoc)
         run: |
-          # Try Mammoth (HTML body to stdout)
-          mammoth --style-map=assets/mammoth-style-map.txt "Guide_1er_cycle_2025_VF.docx" > dist/body.html || true
-
-          # If Mammoth produced non-empty output, wrap it in a full HTML doc
-          if [ -s dist/body.html ]; then
-            echo "Using Mammoth output"
-            printf '%s\n' \
-'<!doctype html>' \
-'<html lang="fr">' \
-'<head>' \
-'  <meta charset="utf-8">' \
-'  <meta name="viewport" content="width=device-width, initial-scale=1">' \
-'  <title>Guide du programme d'"'"'histoire – UQAM</title>' \
-'  <link rel="stylesheet" href="assets/uqam-guide.css">' \
-'</head>' \
-'<body>' > dist/index.html
-            cat dist/body.html >> dist/index.html
-            printf '\n</body></html>\n' >> dist/index.html
-          else
-            echo "Mammoth empty → falling back to Pandoc"
-            pandoc "Guide_1er_cycle_2025_VF.docx" \
-                   -s \
-                   --metadata title="Guide du programme d'histoire – UQAM" \
-                   --css=assets/uqam-guide.css \
-                   -o dist/index.html
-          fi
-
-      # Copy CSS (and any other assets) next to the page
-      - name: Copy assets
-        run: |
-          mkdir -p dist/assets
-          cp -r assets/* dist/assets/ || true
+          pandoc "Guide_1er_cycle_2025_VF.docx" \
+                 -s \
+                 --metadata title="Guide du programme d'histoire – UQAM" \
+                 --css=assets/uqam-guide.css \
+                 -o dist/index.html
 
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
