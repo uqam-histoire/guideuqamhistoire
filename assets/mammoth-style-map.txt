@@ -1,9 +1,0 @@
-# Minimal Mammoth style map (safe even if styles don't exist)
-p[style-name='Normal'] => p
-p[style-name='Citation'] => blockquote:fresh
-p[style-name='Quote'] => blockquote:fresh
-p[style-name='Bibliographie'] => p.bib-entry
-
-note-reference => sup.note-ref
-r[style-name='Strong'] => strong
-r[style-name='Emphasis'] => em
