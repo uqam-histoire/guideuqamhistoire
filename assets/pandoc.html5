@@ -8,7 +8,10 @@
 </head>
 <body id="top">
 <header class="site-header">
-  <h1>$title$</h1>
+  <h1>
+    $title$
+    <span class="badge badge-mobile">Version mobile</span>
+  </h1>
   <nav class="doc-actions">
     <a class="btn" href="Guide_1er_cycle_2025_VF.pdf">PDF imprimable</a>
   </nav>
