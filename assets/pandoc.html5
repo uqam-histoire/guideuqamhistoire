@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="$lang$">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$title$</title>
+  $for(css)$<link rel="stylesheet" href="$css$">$endfor$
+</head>
+<body id="top">
+<header class="site-header">
+  <h1>$title$</h1>
+  <nav class="doc-actions">
+    <a class="btn" href="Guide_1er_cycle_2025_VF.pdf">PDF imprimable</a>
+  </nav>
+</header>
+
+$if(toc)$
+<details class="toc" open>
+  <summary>Sommaire</summary>
+  $toc$
+</details>
+$endif$
+
+$body$
+
+<footer class="site-footer">
+  <p>Dernière mise à jour : $date$</p>
+  <p><a href="#top">Retour en haut</a></p>
+</footer>
+</body>
+</html>
