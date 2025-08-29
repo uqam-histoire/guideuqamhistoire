@@ -1,3 +1,5 @@
+permissions:
+  contents: write
 name: Build & publish undergraduate guide
 on:
   push:
@@ -54,3 +56,14 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           publish_dir: dist
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "Guide_1er_cycle_2025_VF.docx"
+      - "assets/**"
+      - ".github/workflows/build-guide.yml"
+  workflow_dispatch:
+
