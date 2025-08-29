@@ -58,12 +58,3 @@ jobs:
           publish_dir: dist
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-on:
-  push:
-    branches: [ main ]
-    paths:
-      - "Guide_1er_cycle_2025_VF.docx"
-      - "assets/**"
-      - ".github/workflows/build-guide.yml"
-  workflow_dispatch:
-
