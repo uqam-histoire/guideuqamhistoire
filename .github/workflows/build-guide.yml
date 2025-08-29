@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Tools + Times New Roman for faithful PDF
+      # Install tools + Times New Roman for faithful PDF
       - name: Install converters & fonts
         run: |
           sudo apt-get update
@@ -35,11 +35,11 @@ jobs:
           mkdir -p dist/assets
           cp -r assets/* dist/assets/ || true
 
-      # Show build date in the HTML footer
+      # Optional: surface build date in the HTML footer
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
 
-      # DOCX → PDF with embedded fonts & bookmarks
+      # DOCX → PDF (desktop), embed fonts & bookmarks
       - name: Convert DOCX to PDF
         run: |
           libreoffice --headless \
@@ -47,8 +47,61 @@ jobs:
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
 
-      # DOCX → HTML with numbered sections + ToC + custom template
-      - name: Convert DOCX to HTML (Pandoc, template)
+      # (Optional) Set PDF metadata (Title/Author/Subject)
+      - name: Install exiftool
+        run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+      - name: Set PDF metadata
+        env:
+          PDF_TITLE: "Guide du programme d'histoire – UQAM"
+          PDF_AUTHOR: "Département d’histoire, UQAM"
+          PDF_SUBJECT: "Guide du 1er cycle (B.A., majeure, mineures, certificats)"
+        run: |
+          exiftool -overwrite_original \
+            -Title="$PDF_TITLE" \
+            -Author="$PDF_AUTHOR" \
+            -Subject="$PDF_SUBJECT" \
+            -Keywords="UQAM, Histoire, Premier cycle, Guide" \
+            dist/Guide_1er_cycle_2025_VF.pdf
+          exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
+
+      # Create a Pandoc HTML template on the fly (no missing file issues)
+      - name: Create Pandoc HTML template
+        run: |
+          mkdir -p assets
+          printf '%s\n' \
+'<!doctype html>' \
+'<html lang="$lang$">' \
+'<head>' \
+'  <meta charset="utf-8">' \
+'  <meta name="viewport" content="width=device-width, initial-scale=1">' \
+'  <title>$title$</title>' \
+'  $for(css)$<link rel="stylesheet" href="$css$">$endfor$' \
+'</head>' \
+'<body id="top">' \
+'<header class="site-header">' \
+'  <h1>$title$</h1>' \
+'  <nav class="doc-actions"><a class="btn" href="Guide_1er_cycle_2025_VF.pdf">PDF imprimable</a></nav>' \
+'</header>' \
+'' \
+'$if(toc)$' \
+'<details class="toc" open>' \
+'  <summary>Sommaire</summary>' \
+'  $toc$' \
+'</details>' \
+'$endif$' \
+'' \
+'$body$' \
+'' \
+'<footer class="site-footer">' \
+'  <p>Dernière mise à jour : $date$</p>' \
+'  <p><a href="#top">Retour en haut</a></p>' \
+'</footer>' \
+'</body>' \
+'</html>' \
+> assets/pandoc.html5
+
+      # DOCX → HTML (mobile) with ToC, numbered sections, and template
+      - name: Convert DOCX to HTML (Pandoc)
         run: |
           pandoc "Guide_1er_cycle_2025_VF.docx" \
                  -s -t html5 \
