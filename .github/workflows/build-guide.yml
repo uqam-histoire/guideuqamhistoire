@@ -18,20 +18,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- Install LibreOffice and Times New Roman (MS core fonts) ---
-      - name: Install LibreOffice & fonts (Times New Roman)
+      # --- Install LibreOffice (PDF), Pandoc (HTML fallback), fonts (Times New Roman) ---
+      - name: Install converters & fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y libreoffice fontconfig software-properties-common
+          sudo apt-get install -y libreoffice pandoc fontconfig software-properties-common
           sudo add-apt-repository multiverse -y
           sudo apt-get update
           echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
           sudo apt-get install -y ttf-mscorefonts-installer
           sudo fc-cache -f -v
-          # Sanity check (non-fatal if it prints nothing the first time)
           fc-list | grep -i "Times New Roman" || true
 
-      - name: Setup Node (for Mammoth)
+      # --- Setup Node + Mammoth (primary HTML converter) ---
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -40,9 +40,9 @@ jobs:
         run: npm install -g mammoth
 
       - name: Prepare dist/
-        run: mkdir -p dist assets
+        run: mkdir -p dist
 
-      # --- DOCX ➜ PDF (desktop), with font embedding and bookmarks ---
+      # --- DOCX ➜ PDF (desktop), with embedded fonts & bookmarks ---
       - name: Convert DOCX to PDF
         run: |
           libreoffice --headless \
@@ -50,32 +50,48 @@ jobs:
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
 
-      # --- DOCX ➜ HTML (mobile), wrapped in a full HTML document ---
-      - name: Convert DOCX to HTML (body only)
+      # --- DOCX ➜ HTML (mobile): Mammoth first, Pandoc fallback if empty ---
+      - name: Convert DOCX to HTML (Mammoth → Pandoc fallback)
         run: |
+          # Try Mammoth (outputs body HTML to stdout)
           mammoth \
             --style-map=assets/mammoth-style-map.txt \
-            --output-dir=dist \
-            "Guide_1er_cycle_2025_VF.docx" > dist/body.html
+            "Guide_1er_cycle_2025_VF.docx" > dist/body.html || true
 
-      - name: Assemble index.html with head/body + CSS
+          echo "Mammoth body.html size:"
+          wc -c dist/body.html || true
+          echo "Mammoth body.html head:"
+          head -n 40 dist/body.html || true
+
+          if [ -s dist/body.html ]; then
+            echo "Using Mammoth output."
+            cat > dist/index.html <<'HTML'
+            <!doctype html>
+            <html lang="fr">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>Guide du programme d'histoire – UQAM</title>
+              <link rel="stylesheet" href="assets/uqam-guide.css">
+            </head>
+            <body>
+            HTML
+            cat dist/body.html >> dist/index.html
+            echo '</body></html>' >> dist/index.html
+          else
+            echo "Mammoth produced empty output — falling back to Pandoc."
+            pandoc "Guide_1er_cycle_2025_VF.docx" \
+                   -s \
+                   --metadata title="Guide du programme d'histoire – UQAM" \
+                   --css=assets/uqam-guide.css \
+                   -o dist/index.html
+          fi
+
+      # --- Copy CSS (used by either path) ---
+      - name: Copy assets
         run: |
-          cat > dist/index.html <<'HTML'
-          <!doctype html>
-          <html lang="fr">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Guide du programme d'histoire – UQAM</title>
-            <link rel="stylesheet" href="assets/uqam-guide.css">
-          </head>
-          <body>
-          HTML
-          cat dist/body.html >> dist/index.html
-          echo '</body></html>' >> dist/index.html
-
-      - name: Copy assets to site
-        run: cp -r assets dist/assets
+          mkdir -p dist/assets
+          cp -r assets/* dist/assets/ || true
 
       # --- Publish to GitHub Pages (gh-pages branch) ---
       - name: Deploy to GitHub Pages
