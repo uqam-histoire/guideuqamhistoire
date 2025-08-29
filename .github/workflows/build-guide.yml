@@ -1,12 +1,16 @@
-permissions:
-  contents: write
 name: Build & publish undergraduate guide
+
 on:
   push:
+    branches: [ main ]
     paths:
       - "Guide_1er_cycle_2025_VF.docx"
       - "assets/**"
       - ".github/workflows/build-guide.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -14,12 +18,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install LibreOffice for PDF and Node for Mammoth
-      - name: Install converters
+      # --- Install LibreOffice and Times New Roman (MS core fonts) ---
+      - name: Install LibreOffice & fonts (Times New Roman)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libreoffice
-      - name: Setup Node
+          sudo apt-get install -y libreoffice fontconfig software-properties-common
+          sudo add-apt-repository multiverse -y
+          sudo apt-get update
+          echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
+          sudo apt-get install -y ttf-mscorefonts-installer
+          sudo fc-cache -f -v
+          # Sanity check (non-fatal if it prints nothing the first time)
+          fc-list | grep -i "Times New Roman" || true
+
+      - name: Setup Node (for Mammoth)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -27,34 +39,48 @@ jobs:
       - name: Install Mammoth
         run: npm install -g mammoth
 
-      - name: Make dist folder
+      - name: Prepare dist/
         run: mkdir -p dist assets
 
-      # DOCX → PDF (desktop)
-      - name: Convert to PDF
-        run: libreoffice --headless --convert-to pdf "Guide_1er_cycle_2025_VF.docx" --outdir dist
+      # --- DOCX ➜ PDF (desktop), with font embedding and bookmarks ---
+      - name: Convert DOCX to PDF
+        run: |
+          libreoffice --headless \
+            --convert-to "pdf:writer_pdf_Export:EmbedStandardFonts=true;ExportBookmarks=true;SelectPdfVersion=1" \
+            "Guide_1er_cycle_2025_VF.docx" \
+            --outdir dist
 
-      # DOCX → HTML (mobile) with CSS + style map
-      - name: Convert to HTML
+      # --- DOCX ➜ HTML (mobile), wrapped in a full HTML document ---
+      - name: Convert DOCX to HTML (body only)
         run: |
           mammoth \
             --style-map=assets/mammoth-style-map.txt \
             --output-dir=dist \
-            "Guide_1er_cycle_2025_VF.docx" > dist/index.html
+            "Guide_1er_cycle_2025_VF.docx" > dist/body.html
 
-      # Inject our CSS link into the HTML head (simple sed)
-      - name: Add CSS link
+      - name: Assemble index.html with head/body + CSS
         run: |
-          sed -i 's#</head>#<link rel="stylesheet" href="assets/uqam-guide.css"></head>#' dist/index.html
+          cat > dist/index.html <<'HTML'
+          <!doctype html>
+          <html lang="fr">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Guide du programme d'histoire – UQAM</title>
+            <link rel="stylesheet" href="assets/uqam-guide.css">
+          </head>
+          <body>
+          HTML
+          cat dist/body.html >> dist/index.html
+          echo '</body></html>' >> dist/index.html
 
-      # Copy CSS to the published site
-      - name: Copy assets
+      - name: Copy assets to site
         run: cp -r assets dist/assets
 
-      # Publish to GitHub Pages
+      # --- Publish to GitHub Pages (gh-pages branch) ---
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           publish_dir: dist
+          publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
