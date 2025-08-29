@@ -1,20 +1,16 @@
-# Minimal Mammoth style map.
-# Headings are mapped automatically by Mammoth:
-#   "Heading 1" → <h1>, "Heading 2" → <h2>, etc.
-
-# Keep "Normal" paragraphs as plain <p>
+# Make “Normal” paragraphs plain <p>
 p[style-name='Normal'] => p
 
-# If you use a “Citation”/“Quote” style in Word, render as <blockquote>
+# Turn “Quote” / “Citation” into blockquote (if used)
 p[style-name='Citation'] => blockquote:fresh
 p[style-name='Quote'] => blockquote:fresh
 
-# Bibliography-like paragraphs (if such a custom style exists) with hanging indent
+# Bibliography-like lines get a hanging indent
 p[style-name='Bibliographie'] => p.bib-entry
 
-# Footnote references as compact superscripts with a link
+# Keep footnotes; Mammoth auto-maps them. Mark footnote references:
 note-reference => sup.note-ref
 
-# Strong/emphasis runs map cleanly
+# Avoid spans for bold/italic headings converted from Word
 r[style-name='Strong'] => strong
 r[style-name='Emphasis'] => em
