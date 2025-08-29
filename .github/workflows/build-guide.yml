@@ -1,0 +1,56 @@
+name: Build & publish undergraduate guide
+on:
+  push:
+    paths:
+      - "Guide_1er_cycle_2025_VF.docx"
+      - "assets/**"
+      - ".github/workflows/build-guide.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install LibreOffice for PDF and Node for Mammoth
+      - name: Install converters
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Mammoth
+        run: npm install -g mammoth
+
+      - name: Make dist folder
+        run: mkdir -p dist assets
+
+      # DOCX → PDF (desktop)
+      - name: Convert to PDF
+        run: libreoffice --headless --convert-to pdf "Guide_1er_cycle_2025_VF.docx" --outdir dist
+
+      # DOCX → HTML (mobile) with CSS + style map
+      - name: Convert to HTML
+        run: |
+          mammoth \
+            --style-map=assets/mammoth-style-map.txt \
+            --output-dir=dist \
+            "Guide_1er_cycle_2025_VF.docx" > dist/index.html
+
+      # Inject our CSS link into the HTML head (simple sed)
+      - name: Add CSS link
+        run: |
+          sed -i 's#</head>#<link rel="stylesheet" href="assets/uqam-guide.css"></head>#' dist/index.html
+
+      # Copy CSS to the published site
+      - name: Copy assets
+        run: cp -r assets dist/assets
+
+      # Publish to GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_dir: dist
