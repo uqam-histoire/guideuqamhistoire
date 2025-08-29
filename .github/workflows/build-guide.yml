@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install tools and fonts (Times New Roman)
+      # Tools + Times New Roman for faithful PDF
       - name: Install converters & fonts
         run: |
           sudo apt-get update
@@ -35,7 +35,11 @@ jobs:
           mkdir -p dist/assets
           cp -r assets/* dist/assets/ || true
 
-      # DOCX → PDF (desktop), embed fonts & bookmarks
+      # Show build date in the HTML footer
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
+
+      # DOCX → PDF with embedded fonts & bookmarks
       - name: Convert DOCX to PDF
         run: |
           libreoffice --headless \
@@ -43,12 +47,16 @@ jobs:
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
 
-      # DOCX → HTML (mobile) with Pandoc (full, valid HTML)
-      - name: Convert DOCX to HTML (Pandoc)
+      # DOCX → HTML with numbered sections + ToC + custom template
+      - name: Convert DOCX to HTML (Pandoc, template)
         run: |
           pandoc "Guide_1er_cycle_2025_VF.docx" \
-                 -s \
+                 -s -t html5 \
+                 --template=assets/pandoc.html5 \
                  --metadata title="Guide du programme d'histoire – UQAM" \
+                 --metadata lang=fr \
+                 --metadata date="${BUILD_DATE}" \
+                 --toc --toc-depth=3 --number-sections \
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
 
