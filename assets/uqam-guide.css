@@ -65,3 +65,47 @@ blockquote { border-left:4px solid #cfd9e3; margin:1rem 0; padding:.5rem 1rem; b
 
 /* Tweak ToC spacing a touch */
 details.toc { margin: .75rem 0 1.25rem; }
+
+/* --- Slim top bar --- */
+.topbar {
+  display:flex; justify-content:space-between; align-items:center;
+  gap:.75rem; padding:.5rem 0; margin-bottom:.5rem;
+}
+.badge-mobile {
+  display:inline-block; padding:.15rem .5rem; border-radius:999px;
+  background: var(--uqam-blue); color:#fff; font-size:.75rem;
+}
+.doc-actions .btn {
+  display:inline-block; padding:.5rem .75rem; border-radius:.5rem;
+  border:1px solid #cfd9e3; background:#f6f8fa;
+}
+
+/* --- Masthead drawn from the DOCX's own first paragraphs --- */
+body > p:nth-of-type(-n+5) { /* first five paragraphs */
+  text-align:center; margin:.2rem 0;
+}
+
+/* Lines 1–3: institution, department, faculty */
+body > p:nth-of-type(1),
+body > p:nth-of-type(2),
+body > p:nth-of-type(3) {
+  font-variant-caps: small-caps;
+  letter-spacing:.03em; font-weight:600; color:#374151; font-size:.95rem;
+}
+
+/* Line 4: the long French title */
+body > p:nth-of-type(4) {
+  margin:.4rem 0 .2rem;
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-weight:700; line-height:1.25;
+  font-size: clamp(1.2rem, 1rem + 2.6vw, 2rem);
+}
+
+/* Line 5: date */
+body > p:nth-of-type(5) {
+  color:#6b7280; font-size:.95rem; margin-bottom:.6rem;
+}
+
+/* ToC spacing after the masthead */
+details.toc { margin: .75rem 0 1.25rem; }
+
