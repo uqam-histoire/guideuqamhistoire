@@ -50,6 +50,13 @@ h1, h2, h3 { margin-top: 1.2rem; margin-bottom: .35rem; }
 ul, ol { margin: 0 0 var(--para-after); padding-left: 1.25em; }
 li { margin: 0 0 .25rem; }
 
+/* Reusable hanging indent */
+.hang { padding-left: 1.4em; text-indent: -1.4em; }
+
+/* Common mappings from our pipeline */
+p.Bibliographie, p.bib-entry { padding-left: 1.4em; text-indent: -1.4em; }
+
+
 /* “Version mobile” pill */
 .badge {
   display:inline-block;
