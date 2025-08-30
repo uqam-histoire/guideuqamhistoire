@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>$title$</title>
-  $for(css)$<link rel="stylesheet" href="$css$">$endfor$
+  $for(css)$<link rel="stylesheet" href="$css$?v=$date$">$endfor$
 </head>
 <body id="top">
 <header class="topbar">
@@ -30,3 +30,5 @@ $body$
 </footer>
 </body>
 </html>
+
+
