@@ -72,29 +72,17 @@ section[id*="bibliographie"] section.level4 p { outline: 1px dotted #bbb; }
 
 /* ==== Hanging indents for bibliography entries ==== */
 
-/* Primary: anything inside our Lua-tagged wrapper */
+/* ==== Hanging indents for bibliography entries (tagged by Lua) ==== */
 .ref-entry p {
   margin: 0 0 var(--para-after);
-  padding-left: 1.5em !important;
-  text-indent: -1.5em !important;
+  padding-left: 1.5em;
+  text-indent: -1.5em;
 }
 
-/* Structural fallback: indent all paragraphs in 2.4.2 subsections,
-   except the first explanatory paragraph and anything inside lists. */
-section[id*="bibliographie"] section.level4 p {
-  padding-left: 1.5em !important;
-  text-indent: -1.5em !important;
-}
-section[id*="bibliographie"] section.level4 > p:first-of-type,
-section[id*="bibliographie"] section.level4 li p {
-  padding-left: 0 !important;
-  text-indent: 0 !important;
-}
-
-/* If Pandoc emits a style-based class after all, cover it too */
+/* Safety net if Pandoc ever exposes a style class */
 p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
-  padding-left: 1.5em !important;
-  text-indent: -1.5em !important;
+  padding-left: 1.5em;
+  text-indent: -1.5em;
 }
 
 /* Print */
