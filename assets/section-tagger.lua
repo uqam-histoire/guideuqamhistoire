@@ -1,9 +1,10 @@
 -- assets/section-tagger.lua
--- 1) Wrap the "mock title page" (from “Université du Québec à Montréal”
---    down to before “Table des matières”) in <div class="title-mock">.
--- 2) (Optional hook) If you later mark bibliography sample lines in Word
---    with a paragraph style named “Bibliographie”, Pandoc will emit
---    <p class="Bibliographie"> and the CSS below will give them a hanging indent.
+-- Wraps two regions for easier CSS styling:
+--   1) In the "Annexes" part, the consecutive lines of the "Modèle de page titre"
+--      (detected by the first line "Université du Québec à Montréal") are wrapped
+--      in <div class="title-mock">.
+--   2) Any section whose heading looks like "Références bibliographiques" or
+--      "Exemples de références ..." is wrapped in <div class="biblio-samples">.
 
 local function norm(s)
   if not s then return "" end
@@ -16,48 +17,65 @@ local function norm(s)
   return s
 end
 
+local function is_biblio_heading(txt)
+  txt = norm(txt)
+  return txt:match("references bibliographiques")
+      or (txt:match("biblio") and (txt:match("exemple") or txt:match("modele")))
+      or (txt:match("references") and txt:match("exemple"))
+end
+
 function Pandoc(doc)
-  local src = doc.blocks
-  local out = {}
-  local i = 1
+  local src, out = doc.blocks, {}
+  local i, in_annexes = 1, false
+
   while i <= #src do
     local b = src[i]
 
-    -- Detect the first line of the mock title page as a plain paragraph.
-    if b.t == "Para" or b.t == "Plain" then
-      local txt = norm(pandoc.utils.stringify(b))
-      if txt:match("universite du quebec a montreal") then
-        -- collect until we hit the start of the table of contents card
-        local collected = { b }
-        local j = i + 1
+    if b.t == "Header" then
+      local txt = pandoc.utils.stringify(b.content)
+      -- Track when we enter the Annexes section
+      in_annexes = in_annexes or norm(txt):match("^annexes$")
+      table.insert(out, b)
+
+      -- Wrap bibliography examples section
+      if is_biblio_heading(txt) then
+        local lvl, j, collected = b.level, i + 1, {}
         while j <= #src do
           local nb = src[j]
-          local kind = nb.t
-          local ntext = norm(pandoc.utils.stringify(nb))
-
-          -- Stop before “Table des matières” line or a blockquote ToC,
-          -- or at the next real section header.
-          if (kind == "Para" or kind == "Plain") and ntext:match("table des matieres") then
-            break
-          end
-          if kind == "BlockQuote" or kind == "Header" then
-            break
-          end
-
+          if nb.t == "Header" and nb.level <= lvl then break end
           table.insert(collected, nb)
           j = j + 1
         end
-
-        table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"title-mock"})))
-        i = j -- continue after what we wrapped
+        table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"biblio-samples"})))
+        i = j
       else
-        table.insert(out, b)
         i = i + 1
       end
 
+    elseif in_annexes and (b.t == "Para" or b.t == "Plain") then
+      -- Look for the *annex* title-page start line
+      local first = norm(pandoc.utils.stringify(b))
+      if first:match("universite du quebec a montreal") then
+        local j, collected, count = i + 1, { b }, 1
+        while j <= #src do
+          local nb, kind = src[j], src[j].t
+          if kind == "Header" then break end
+          local ntext = norm(pandoc.utils.stringify(nb))
+          -- stop before the next annex item such as "Modèle de table ..."
+          if ntext:match("modele de table") or ntext:match("exemple de texte") then break end
+          table.insert(collected, nb)
+          count = count + 1
+          if count > 30 then break end -- safety guard
+          j = j + 1
+        end
+        table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"title-mock"})))
+        i = j
+      else
+        table.insert(out, b); i = i + 1
+      end
+
     else
-      table.insert(out, b)
-      i = i + 1
+      table.insert(out, b); i = i + 1
     end
   end
 
