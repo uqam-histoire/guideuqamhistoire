@@ -336,33 +336,37 @@ p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
   padding-left: 1.4em; text-indent: -1.4em;
 }
 
-/* ============ Hanging indents in “Références bibliographiques” ============ */
-/* Our Lua filter wraps the whole references area in .biblio-samples          */
-/* Indent: (a) any paragraph that follows another paragraph in a subsection,  */
-/*         (b) the first paragraph after a list (ul/ol),                      */
-/*         (c) any later consecutive paragraph.                               */
+/* ============ Hanging indents in 2.4.2 Bibliographie ============ */
+/* Preferred path: the Lua filter wraps 2.4.2 as .biblio-samples     */
+.biblio-samples > section > p + p,
+.biblio-samples > section > ul + p,
+.biblio-samples > section > ol + p,
+.biblio-samples > section > div + p {
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+}
+/* Multi-paragraph entries (rare) */
+.biblio-samples > section > p + p + p {
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+}
+/* Do not indent the first explanatory paragraph in each sub-section */
+.biblio-samples > section > p:first-of-type { text-indent: 0; padding-left: 0; }
 
-.biblio-samples section > p + p,
-.biblio-samples section > ul + p,
-.biblio-samples section > ol + p,
-.biblio-samples section > p + div > p {     /* in case Pandoc wraps runs */
+/* Fallback: if for any reason the wrapper is missing, target the section by id */
+section#bibliographie > section > p + p,
+section#bibliographie > section > ul + p,
+section#bibliographie > section > ol + p,
+section#bibliographie > section > div + p,
+section[id*="bibliographie"] > section > p + p,
+section[id*="bibliographie"] > section > ul + p,
+section[id*="bibliographie"] > section > ol + p,
+section[id*="bibliographie"] > section > div + p {
   padding-left: 1.4em;
   text-indent: -1.4em;
 }
 
-/* If a reference spans multiple paragraphs (rare), keep the indent */
-.biblio-samples section > p + p + p {       /* third and later paras */
-  padding-left: 1.4em;
-  text-indent: -1.4em;
-}
-
-/* Do NOT indent the first explanatory paragraph in each subsection */
-.biblio-samples section > p:first-of-type {
-  padding-left: 0;
-  text-indent: 0;
-}
-
-/* Safety: if Pandoc ever does carry a style, cover those too */
+/* If some entries are emitted with a paragraph class from Word styles, cover them too */
 p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
   padding-left: 1.4em;
   text-indent: -1.4em;
