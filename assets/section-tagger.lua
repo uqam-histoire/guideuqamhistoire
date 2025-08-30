@@ -1,8 +1,6 @@
 -- assets/section-tagger.lua
--- What it does:
---  1) In ANNEXES, wrap the “modèle de page titre” lines in <div class="title-mock">.
---  2) In 2.4.2 “Bibliographie”, tag actual reference paragraphs as <div class="ref-entry"><p>…</p></div>
---     so CSS can give them hanging indents, regardless of missing Word style classes.
+-- 1) In ANNEXES, wrap the “modèle de page titre” lines in <div class="title-mock">.
+-- 2) In 2.4.2 “Bibliographie”, tag only true reference paragraphs as <div class="ref-entry">…</div>.
 
 local function norm(s)
   if not s then return "" end
@@ -15,9 +13,53 @@ local function norm(s)
   return s
 end
 
--- Heuristic: recognize the 2.4.2 Bibliographie heading text
 local function is_biblio_heading(txt)
   return norm(txt):match("bibliographie")
+end
+
+-- Heuristic: does a paragraph "look like" a bibliographic reference?
+-- Signals we use (any one is enough):
+--   A) runs of ASCII caps before a comma early (e.g., "POLLARD, Richard …")
+--   B) presence of emphasized (italic) text (the title) AND a comma early
+-- We also exclude typical explanatory starters ("si ", "voir ", "de plus", etc.)
+local function is_reference_para(para)
+  if not para or not para.t then return false end
+
+  local raw = pandoc.utils.stringify(para) or ""
+  local raw_trim = raw:match("^%s*(.-)%s*$")
+
+  -- Exclude obvious non-reference intros
+  local lead = norm(raw_trim):sub(1, 8)
+  if lead:match("^si ") or lead:match("^voir ") or lead:match("^de plus") or lead:match("^nota") then
+    return false
+  end
+
+  -- Early comma?
+  local first_comma = raw:find(",")
+  local early_comma = first_comma and first_comma <= 80
+
+  -- Caps run before comma (ASCII, good enough for most surnames)
+  local before = first_comma and raw:sub(1, first_comma - 1) or ""
+  local caps_run = before:match("%u%u+") ~= nil -- e.g., GAGNON, POLLARD
+
+  -- Has emphasized (italic) inlines (book/article titles)
+  local has_emph = false
+  if para.t == "Para" or para.t == "Plain" then
+    for _, inl in ipairs(para.content or {}) do
+      if inl.t == "Emph" then
+        has_emph = true
+        break
+      end
+    end
+  end
+
+  if early_comma and (caps_run or has_emph) then
+    -- Also avoid very short lines like "Voir la section Livres"
+    if #raw_trim >= 40 then
+      return true
+    end
+  end
+  return false
 end
 
 function Pandoc(doc)
@@ -26,9 +68,6 @@ function Pandoc(doc)
   local in_annexes = false
   local in_biblio  = false
   local biblio_lvl = nil
-  local sub_lvl    = nil
-  local seen_first_para = false
-  local after_list = false
 
   while i <= #src do
     local b = src[i]
@@ -37,30 +76,19 @@ function Pandoc(doc)
       local txt = pandoc.utils.stringify(b.content)
       local n   = norm(txt)
 
-      -- Track “Annexes”
       if n == "annexes" then in_annexes = true end
-
-      -- Enter/leave 2.4.2 Bibliographie
       if is_biblio_heading(txt) then
         in_biblio  = true
         biblio_lvl = b.level
-        sub_lvl, seen_first_para, after_list = nil, false, false
       elseif in_biblio and b.level <= biblio_lvl then
         in_biblio  = false
         biblio_lvl = nil
-      end
-
-      -- Starting a new subsection inside Bibliographie?
-      if in_biblio and b.level > biblio_lvl then
-        sub_lvl = b.level
-        seen_first_para, after_list = false, false
       end
 
       table.insert(out, b)
       i = i + 1
 
     elseif in_annexes and (b.t == "Para" or b.t == "Plain") then
-      -- Find the annex title-page mock: it begins with “Université du Québec à Montréal”
       local first = norm(pandoc.utils.stringify(b))
       if first:match("universite du quebec a montreal") then
         local j, collected, count = i + 1, { b }, 1
@@ -71,7 +99,7 @@ function Pandoc(doc)
           if ntext:match("modele de table") or ntext:match("exemple de texte") then break end
           table.insert(collected, nb)
           count = count + 1
-          if count > 30 then break end -- safety
+          if count > 30 then break end
           j = j + 1
         end
         table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"title-mock"})))
@@ -80,39 +108,13 @@ function Pandoc(doc)
         table.insert(out, b); i = i + 1
       end
 
-    elseif in_biblio then
-      -- Inside Bibliographie: tag reference paragraphs structurally
-      if b.t == "BulletList" or b.t == "OrderedList" then
-        table.insert(out, b)
-        after_list = true
-        i = i + 1
-
-      elseif b.t == "Para" or b.t == "Plain" then
-        local wrap = false
-        if after_list then
-          -- First paragraph after a list is a reference entry
-          wrap = true
-          after_list = false
-          seen_first_para = true
-        elseif not seen_first_para then
-          -- First explanatory paragraph in a subsection: do not wrap
-          wrap = false
-          seen_first_para = true
-        else
-          -- Subsequent paragraphs: wrap as references
-          wrap = true
-        end
-
-        if wrap then
-          table.insert(out, pandoc.Div({ b }, pandoc.Attr("", {"ref-entry"})))
-        else
-          table.insert(out, b)
-        end
-        i = i + 1
-
+    elseif in_biblio and (b.t == "Para" or b.t == "Plain") then
+      if is_reference_para(b) then
+        table.insert(out, pandoc.Div({ b }, pandoc.Attr("", {"ref-entry"})))
       else
-        table.insert(out, b); i = i + 1
+        table.insert(out, b)
       end
+      i = i + 1
 
     else
       table.insert(out, b); i = i + 1
