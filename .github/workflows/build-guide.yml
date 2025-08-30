@@ -65,35 +65,6 @@ jobs:
             dist/Guide_1er_cycle_2025_VF.pdf
           exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
 
-      # Find the PDF page that contains the mock title page and render it to PNG
-      - name: Install poppler-utils (pdftotext/pdftoppm)
-        run: sudo apt-get update && sudo apt-get install -y poppler-utils
-
-      - name: Extract mock title page as PNG
-        env:
-          PDF: dist/Guide_1er_cycle_2025_VF.pdf
-        run: |
-          set -e
-          pages=$(pdfinfo "$PDF" | awk '/Pages:/ {print $2}')
-          target=""
-          for i in $(seq 1 "$pages"); do
-            # Look for distinctive lines on that mock title page
-            if pdftotext -f "$i" -l "$i" "$PDF" - | grep -Eqi 'Université du Québec à Montréal|Titre du travail'; then
-              target="$i"; break
-            fi
-          done
-          if [ -n "$target" ]; then
-            mkdir -p dist/images
-            # Render that single page to a high-dpi PNG
-            pdftoppm -f "$target" -l "$target" -png -rx 220 -ry 220 "$PDF" dist/images/title-mock
-            # Normalize filename to dist/images/title-mock.png
-            mv "dist/images/title-mock-$target.png" dist/images/title-mock.png
-            echo "TITLE_MOCK_PAGE=$target" >> "$GITHUB_ENV"
-          else
-            echo "Could not locate mock title page — keeping HTML text."
-          fi
-
-
       # DOCX → HTML (mobile) with ToC, numbered sections, and committed template
       - name: Convert DOCX to HTML (Pandoc)
         run: |
@@ -108,12 +79,6 @@ jobs:
                  --toc --toc-depth=3 --number-sections \
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
-
-      - name: Replace HTML mock block with PNG (if found)
-        if: env.TITLE_MOCK_PAGE != ''
-        run: |
-          perl -0777 -i -pe 's|<div class="title-mock">.*?</div>|<figure class="title-mock-img"><img src="images/title-mock.png" alt="Modèle de page titre — exemple de mise en page (image)"></figure>|s' dist/index.html
-
 
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
