@@ -288,3 +288,36 @@ p.Bibliographie, p.bib-entry, p.hang { padding-left:1.4em; text-indent:-1.4em; }
   max-width: 36rem;   /* same visual width as the text card */
 }
 
+/* --- Annexes: "Modèle de page titre" (now reliably tagged) --- */
+.title-mock {
+  max-width: 36rem;
+  margin: 1rem auto 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: .6rem;
+  background: #fff;
+  padding: 1rem clamp(.75rem, 3vw, 1.5rem);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+.title-mock p { text-align:center; margin:.33rem 0; line-height:1.35; text-indent:0; }
+.title-mock p:empty { display:block; height:.6rem; }
+.title-mock p:nth-of-type(1),
+.title-mock p:nth-of-type(2),
+.title-mock p:nth-of-type(3) {
+  font-variant-caps: small-caps; letter-spacing:.04em; font-weight:700;
+  color: var(--uqam-blue); font-size:.95rem;
+}
+.title-mock p:nth-of-type(4) { margin-top:.6rem; padding-bottom:.35rem; border-bottom:1px solid #eef2f7; }
+.title-mock p:nth-of-type(4) strong { display:inline-block; font-weight:800; }
+.title-mock p:last-of-type { color:#6b7280; font-size:.95rem; }
+
+/* --- Hanging indents for bibliography examples --- */
+/* The Lua filter wraps the whole section in .biblio-samples so this applies
+   even if paragraphs lack a special class. */
+.biblio-samples > p, .biblio-samples > div > p {
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+}
+
+/* If your DOCX applies a paragraph style that Pandoc exposes (e.g., Rfrence),
+   keep this too so it works outside the examples section if needed. */
+p.Rfrence, p.rfrence, p.Bibliographie, p.bib-entry { padding-left:1.4em; text-indent:-1.4em; }  
