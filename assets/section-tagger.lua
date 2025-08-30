@@ -26,9 +26,9 @@ end
 
 local function is_biblio_heading(txt)
   txt = norm(txt)
-  return txt:match("references bibliographiques")
-      or (txt:match("biblio") and (txt:match("exemple") or txt:match("modele")))
-      or (txt:match("references") and txt:match("exemple"))
+  -- We want precisely the section "Bibliographie" (2.4.2), not "Références bibliographiques"
+  -- "bibliographie" does NOT occur inside "bibliographiques", so this is safe.
+  return txt:match("bibliographie")
 end
 
 -- (A) Normalize custom style "Référence" on any Div wrapper produced by Pandoc
