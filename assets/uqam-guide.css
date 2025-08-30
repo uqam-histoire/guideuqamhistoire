@@ -67,10 +67,35 @@ body > p:nth-of-type(5) { color:#6b7280; font-size:.95rem; margin-bottom:.6rem; 
 .title-mock p:nth-of-type(4) strong { display:inline-block; font-weight:800; }
 .title-mock p:last-of-type { color:#6b7280; font-size:.95rem; }
 
-/* Bibliography: hanging indent (structural tags from Lua) */
-.ref-entry > p { padding-left: 1.4em !important; text-indent: -1.4em !important; }
-/* Fallback if a paragraph style leaks through */
-p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference { padding-left:1.4em; text-indent:-1.4em; }
+/* debug — remove after checking */
+section[id*="bibliographie"] section.level4 p { outline: 1px dotted #bbb; }
+
+/* ==== Hanging indents for bibliography entries ==== */
+
+/* Primary: anything inside our Lua-tagged wrapper */
+.ref-entry p {
+  margin: 0 0 var(--para-after);
+  padding-left: 1.5em !important;
+  text-indent: -1.5em !important;
+}
+
+/* Structural fallback: indent all paragraphs in 2.4.2 subsections,
+   except the first explanatory paragraph and anything inside lists. */
+section[id*="bibliographie"] section.level4 p {
+  padding-left: 1.5em !important;
+  text-indent: -1.5em !important;
+}
+section[id*="bibliographie"] section.level4 > p:first-of-type,
+section[id*="bibliographie"] section.level4 li p {
+  padding-left: 0 !important;
+  text-indent: 0 !important;
+}
+
+/* If Pandoc emits a style-based class after all, cover it too */
+p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
+  padding-left: 1.5em !important;
+  text-indent: -1.5em !important;
+}
 
 /* Print */
 @media print {
