@@ -16,7 +16,9 @@ local function norm(s)
 end
 
 -- Heuristic: recognize the 2.4.2 Bibliographie heading text
-local function is_biblio_heading(txt) return norm(txt):match("^bibliographie$") end
+local function is_biblio_heading(txt)
+  return norm(txt):match("bibliographie")
+end
 
 function Pandoc(doc)
   local src, out = doc.blocks, {}
