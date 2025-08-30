@@ -208,11 +208,13 @@ section[id*="modèle-de-page-titre"] p:last-of-type {
   margin: 1rem 0 1.25rem;
 }
 
-.title-mock p {
-  text-align: center;
-  margin: .35rem 0;
-  line-height: 1.35;
-  text-indent: 0; /* ignore any global first-line indent here */
+.title-mock {
+  border: 1px solid #e5e7eb;
+  border-radius: .6rem;
+  background: #fff;
+  padding: 1rem clamp(.75rem, 3vw, 1.5rem);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  margin: 1rem 0 1.25rem;
 }
 
 /* If some blank paragraphs are present as spacers, give them height */
@@ -241,3 +243,12 @@ section[id*="modèle-de-page-titre"] p:last-of-type {
   color: #6b7280;
   font-size: .95rem;
 }
+
+/* --- Hanging indents for bibliography examples (now wrapped as .biblio-samples) --- */
+.biblio-samples > p,
+.biblio-samples > div > p {           /* covers occasional extra wrappers */
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+
+/* If some examples are lists instead of plain paragraphs */
+.biblio-samples li { padding-left: 1.2em; text-indent: -1.2em; }
