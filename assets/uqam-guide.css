@@ -42,6 +42,14 @@ blockquote { border-left:4px solid #cfd9e3; margin:1rem 0; padding:.5rem 1rem; b
 }
 .doc-actions { flex: 0 0 auto; }
 
+/* Word-like body spacing */
+:root { --lh: 1.35; --para-after: 0.6rem; }  /* tune if needed */
+body { line-height: var(--lh); }
+p { margin: 0 0 var(--para-after); }
+h1, h2, h3 { margin-top: 1.2rem; margin-bottom: .35rem; }
+ul, ol { margin: 0 0 var(--para-after); padding-left: 1.25em; }
+li { margin: 0 0 .25rem; }
+
 /* “Version mobile” pill */
 .badge {
   display:inline-block;
