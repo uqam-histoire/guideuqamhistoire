@@ -335,3 +335,35 @@ p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
 .biblio-samples > p, .biblio-samples > div > p {
   padding-left: 1.4em; text-indent: -1.4em;
 }
+
+/* ============ Hanging indents in “Références bibliographiques” ============ */
+/* Our Lua filter wraps the whole references area in .biblio-samples          */
+/* Indent: (a) any paragraph that follows another paragraph in a subsection,  */
+/*         (b) the first paragraph after a list (ul/ol),                      */
+/*         (c) any later consecutive paragraph.                               */
+
+.biblio-samples section > p + p,
+.biblio-samples section > ul + p,
+.biblio-samples section > ol + p,
+.biblio-samples section > p + div > p {     /* in case Pandoc wraps runs */
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+}
+
+/* If a reference spans multiple paragraphs (rare), keep the indent */
+.biblio-samples section > p + p + p {       /* third and later paras */
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+}
+
+/* Do NOT indent the first explanatory paragraph in each subsection */
+.biblio-samples section > p:first-of-type {
+  padding-left: 0;
+  text-indent: 0;
+}
+
+/* Safety: if Pandoc ever does carry a style, cover those too */
+p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+}
