@@ -68,11 +68,40 @@ body > p:nth-of-type(5) { color:#6b7280; font-size:.95rem; margin-bottom:.6rem; 
 .title-mock p:last-of-type { color:#6b7280; font-size:.95rem; }
 
 
-/* Hanging indents for tagged reference paragraphs */
-.ref-entry p {
+/* ==== Bibliographie tidy: remove any stray boxes/outlines ==== */
+.ref-entry, .ref-entry p,
+section[id*="bibliographie"] section.level4 p {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* ==== Primary: indent any paragraph inside our Lua-tagged wrapper ==== */
+:where(.ref-entry) > :where(p) {
   margin: 0 0 var(--para-after);
   padding-left: 1.5em !important;
   text-indent: -1.5em !important;
+}
+
+/* ==== Fallback (CSS-only) — indents *only* real-looking refs ====
+   Works even if the Lua filter misses something.
+   We indent paragraphs that contain an italicised title (<em>…</em>).
+   Explanatory lines like “Si le livre…” remain flush-left. */
+@supports selector(p:has(em)) {
+  section[id*="bibliographie"] section.level4 p:has(em) {
+    padding-left: 1.5em !important;
+    text-indent: -1.5em !important;
+  }
+  /* Never indent the first explanatory paragraph of each subsection */
+  section[id*="bibliographie"] section.level4 > p:first-of-type {
+    padding-left: 0 !important;
+    text-indent: 0 !important;
+  }
+  /* Never indent list items */
+  section[id*="bibliographie"] section.level4 li p {
+    padding-left: 0 !important;
+    text-indent: 0 !important;
+  }
 }
 
 /* Print */
