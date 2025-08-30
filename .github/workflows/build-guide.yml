@@ -65,13 +65,18 @@ jobs:
             dist/Guide_1er_cycle_2025_VF.pdf
           exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
 
+      - name: List assets and show filter
+        run: |
+          ls -la assets || true
+          sed -n '1,60p' assets/section-tagger.lua || true
+
       # DOCX → HTML (mobile) with ToC, numbered sections, and committed template
       - name: Convert DOCX to HTML (Pandoc)
         run: |
           pandoc "Guide_1er_cycle_2025_VF.docx" \
                  -s -t html5 \
                  --section-divs \
-                 --lua-filter=assets/section-tagger.lua \
+                 --lua-filter=./assets/section-tagger.lua \
                  --template=assets/pandoc.html5 \
                  --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique" \
                  --metadata lang=fr \
@@ -80,22 +85,12 @@ jobs:
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
 
-- name: "Debug – confirm .ref-entry and .title-mock"
-  shell: bash
-  run: |
-    set -e
-    echo '--- looking for .ref-entry ---'
-    if grep -n 'class="ref-entry"' dist/index.html | head -n 20; then
-      echo "found .ref-entry"
-    else
-      echo "no .ref-entry"
-    fi
-    echo '--- looking for .title-mock ---'
-    if grep -n 'class="title-mock"' dist/index.html | head -n 10; then
-      echo "found .title-mock"
-    else
-      echo "no .title-mock"
-    fi
+      - name: Debug confirm ref-entry and title-mock
+        run: |
+          echo '--- looking for .ref-entry ---'
+          grep -n 'class="ref-entry"' dist/index.html | head -n 20 || echo 'none'
+          echo '--- looking for .title-mock ---'
+          grep -n 'class="title-mock"' dist/index.html | head -n 10 || echo 'none'
 
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
