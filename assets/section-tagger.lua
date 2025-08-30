@@ -1,8 +1,8 @@
 -- assets/section-tagger.lua
--- 1) Tag the Annexes "Modèle de page titre" block as <div class="title-mock">.
--- 2) Wrap bibliography example sections as <div class="biblio-samples">.
--- 3) Normalize any block styled with the Word paragraph style “Référence”
---    so it also has class "ref-entry-block" (for hanging indents).
+-- What it does:
+--  1) In ANNEXES, wrap the “modèle de page titre” lines in <div class="title-mock">.
+--  2) In 2.4.2 “Bibliographie”, tag actual reference paragraphs as <div class="ref-entry"><p>…</p></div>
+--     so CSS can give them hanging indents, regardless of missing Word style classes.
 
 local function norm(s)
   if not s then return "" end
@@ -15,74 +15,99 @@ local function norm(s)
   return s
 end
 
-local function has_class_norm(classes, needle)
-  if not classes then return false end
-  local n = norm(needle)
-  for _,c in ipairs(classes) do
-    if norm(c) == n then return true end
-  end
-  return false
-end
+-- Heuristic: recognize the 2.4.2 Bibliographie heading text
+local function is_biblio_heading(txt) return norm(txt):match("^bibliographie$") end
 
-local function is_biblio_heading(txt)
-  txt = norm(txt)
-  -- We want precisely the section "Bibliographie" (2.4.2), not "Références bibliographiques"
-  -- "bibliographie" does NOT occur inside "bibliographiques", so this is safe.
-  return txt:match("bibliographie")
-end
-
--- (A) Normalize custom style "Référence" on any Div wrapper produced by Pandoc
-function Div(el)
-  if has_class_norm(el.classes, "Référence") then
-    table.insert(el.classes, "ref-entry-block")
-    return el
-  end
-  return nil
-end
-
--- (B) Main walker: title-mock and bibliography-samples
 function Pandoc(doc)
   local src, out = doc.blocks, {}
-  local i, in_annexes = 1, false
+  local i = 1
+  local in_annexes = false
+  local in_biblio  = false
+  local biblio_lvl = nil
+  local sub_lvl    = nil
+  local seen_first_para = false
+  local after_list = false
 
   while i <= #src do
     local b = src[i]
 
     if b.t == "Header" then
       local txt = pandoc.utils.stringify(b.content)
-      in_annexes = in_annexes or norm(txt):match("^annexes$")
-      table.insert(out, b)
+      local n   = norm(txt)
 
+      -- Track “Annexes”
+      if n == "annexes" then in_annexes = true end
+
+      -- Enter/leave 2.4.2 Bibliographie
       if is_biblio_heading(txt) then
-        local lvl, j, collected = b.level, i + 1, {}
-        while j <= #src do
-          local nb = src[j]
-          if nb.t == "Header" and nb.level <= lvl then break end
-          table.insert(collected, nb)
-          j = j + 1
-        end
-        table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"biblio-samples"})))
-        i = j
-      else
-        i = i + 1
+        in_biblio  = true
+        biblio_lvl = b.level
+        sub_lvl, seen_first_para, after_list = nil, false, false
+      elseif in_biblio and b.level <= biblio_lvl then
+        in_biblio  = false
+        biblio_lvl = nil
       end
 
+      -- Starting a new subsection inside Bibliographie?
+      if in_biblio and b.level > biblio_lvl then
+        sub_lvl = b.level
+        seen_first_para, after_list = false, false
+      end
+
+      table.insert(out, b)
+      i = i + 1
+
     elseif in_annexes and (b.t == "Para" or b.t == "Plain") then
+      -- Find the annex title-page mock: it begins with “Université du Québec à Montréal”
       local first = norm(pandoc.utils.stringify(b))
       if first:match("universite du quebec a montreal") then
         local j, collected, count = i + 1, { b }, 1
         while j <= #src do
-          local nb, kind = src[j], src[j].t
-          if kind == "Header" then break end
+          local nb = src[j]
+          if nb.t == "Header" then break end
           local ntext = norm(pandoc.utils.stringify(nb))
           if ntext:match("modele de table") or ntext:match("exemple de texte") then break end
           table.insert(collected, nb)
           count = count + 1
-          if count > 30 then break end
+          if count > 30 then break end -- safety
           j = j + 1
         end
         table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"title-mock"})))
         i = j
+      else
+        table.insert(out, b); i = i + 1
+      end
+
+    elseif in_biblio then
+      -- Inside Bibliographie: tag reference paragraphs structurally
+      if b.t == "BulletList" or b.t == "OrderedList" then
+        table.insert(out, b)
+        after_list = true
+        i = i + 1
+
+      elseif b.t == "Para" or b.t == "Plain" then
+        local wrap = false
+        if after_list then
+          -- First paragraph after a list is a reference entry
+          wrap = true
+          after_list = false
+          seen_first_para = true
+        elseif not seen_first_para then
+          -- First explanatory paragraph in a subsection: do not wrap
+          wrap = false
+          seen_first_para = true
+        else
+          -- Subsequent paragraphs: wrap as references
+          wrap = true
+        end
+
+        if wrap then
+          table.insert(out, pandoc.Div({ b }, pandoc.Attr("", {"ref-entry"})))
+        else
+          table.insert(out, b)
+        end
+        i = i + 1
+
       else
         table.insert(out, b); i = i + 1
       end
