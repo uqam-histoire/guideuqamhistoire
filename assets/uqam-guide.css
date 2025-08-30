@@ -321,3 +321,17 @@ p.Bibliographie, p.bib-entry, p.hang { padding-left:1.4em; text-indent:-1.4em; }
 /* If your DOCX applies a paragraph style that Pandoc exposes (e.g., Rfrence),
    keep this too so it works outside the examples section if needed. */
 p.Rfrence, p.rfrence, p.Bibliographie, p.bib-entry { padding-left:1.4em; text-indent:-1.4em; }  
+
+/* Hanging indent for paragraphs styled "Référence" in Word
+   (Pandoc may emit a wrapper Div with that class) */
+.ref-entry-block > p { padding-left: 1.4em; text-indent: -1.4em; }
+
+/* Extra safety: if Pandoc applied the class directly on <p> or used variants */
+p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
+  padding-left: 1.4em; text-indent: -1.4em;
+}
+
+/* Also apply inside our bibliography example wrapper, if present */
+.biblio-samples > p, .biblio-samples > div > p {
+  padding-left: 1.4em; text-indent: -1.4em;
+}
