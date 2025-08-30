@@ -1,10 +1,8 @@
 -- assets/section-tagger.lua
--- Wraps two regions for easier CSS styling:
---   1) In the "Annexes" part, the consecutive lines of the "Modèle de page titre"
---      (detected by the first line "Université du Québec à Montréal") are wrapped
---      in <div class="title-mock">.
---   2) Any section whose heading looks like "Références bibliographiques" or
---      "Exemples de références ..." is wrapped in <div class="biblio-samples">.
+-- 1) Tag the Annexes "Modèle de page titre" block as <div class="title-mock">.
+-- 2) Wrap bibliography example sections as <div class="biblio-samples">.
+-- 3) Normalize any block styled with the Word paragraph style “Référence”
+--    so it also has class "ref-entry-block" (for hanging indents).
 
 local function norm(s)
   if not s then return "" end
@@ -17,6 +15,15 @@ local function norm(s)
   return s
 end
 
+local function has_class_norm(classes, needle)
+  if not classes then return false end
+  local n = norm(needle)
+  for _,c in ipairs(classes) do
+    if norm(c) == n then return true end
+  end
+  return false
+end
+
 local function is_biblio_heading(txt)
   txt = norm(txt)
   return txt:match("references bibliographiques")
@@ -24,6 +31,16 @@ local function is_biblio_heading(txt)
       or (txt:match("references") and txt:match("exemple"))
 end
 
+-- (A) Normalize custom style "Référence" on any Div wrapper produced by Pandoc
+function Div(el)
+  if has_class_norm(el.classes, "Référence") then
+    table.insert(el.classes, "ref-entry-block")
+    return el
+  end
+  return nil
+end
+
+-- (B) Main walker: title-mock and bibliography-samples
 function Pandoc(doc)
   local src, out = doc.blocks, {}
   local i, in_annexes = 1, false
@@ -33,11 +50,9 @@ function Pandoc(doc)
 
     if b.t == "Header" then
       local txt = pandoc.utils.stringify(b.content)
-      -- Track when we enter the Annexes section
       in_annexes = in_annexes or norm(txt):match("^annexes$")
       table.insert(out, b)
 
-      -- Wrap bibliography examples section
       if is_biblio_heading(txt) then
         local lvl, j, collected = b.level, i + 1, {}
         while j <= #src do
@@ -53,7 +68,6 @@ function Pandoc(doc)
       end
 
     elseif in_annexes and (b.t == "Para" or b.t == "Plain") then
-      -- Look for the *annex* title-page start line
       local first = norm(pandoc.utils.stringify(b))
       if first:match("universite du quebec a montreal") then
         local j, collected, count = i + 1, { b }, 1
@@ -61,11 +75,10 @@ function Pandoc(doc)
           local nb, kind = src[j], src[j].t
           if kind == "Header" then break end
           local ntext = norm(pandoc.utils.stringify(nb))
-          -- stop before the next annex item such as "Modèle de table ..."
           if ntext:match("modele de table") or ntext:match("exemple de texte") then break end
           table.insert(collected, nb)
           count = count + 1
-          if count > 30 then break end -- safety guard
+          if count > 30 then break end
           j = j + 1
         end
         table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"title-mock"})))
