@@ -70,6 +70,7 @@ jobs:
         run: |
           pandoc "Guide_1er_cycle_2025_VF.docx" \
                  -s -t html5 \
+                 --section-divs \
                  --template=assets/pandoc.html5 \
                  --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique – UQAM" \
                  --metadata lang=fr \
