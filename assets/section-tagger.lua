@@ -22,44 +22,42 @@ end
 --   A) runs of ASCII caps before a comma early (e.g., "POLLARD, Richard …")
 --   B) presence of emphasized (italic) text (the title) AND a comma early
 -- We also exclude typical explanatory starters ("si ", "voir ", "de plus", etc.)
+-- Heuristic: return true only for paragraphs that look like references
 local function is_reference_para(para)
   if not para or not para.t then return false end
 
   local raw = pandoc.utils.stringify(para) or ""
-  local raw_trim = raw:match("^%s*(.-)%s*$")
+  local text = raw:gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
+  local ntext = norm(text)
 
-  -- Exclude obvious non-reference intros
-  local lead = norm(raw_trim):sub(1, 8)
-  if lead:match("^si ") or lead:match("^voir ") or lead:match("^de plus") or lead:match("^nota") then
-    return false
+  -- Exclude typical explanatory starters
+  local starters = { "^si ", "^voir ", "^de plus", "^par exemple", "^nota", "^remarque", "^attention", "^on " }
+  for _, pat in ipairs(starters) do
+    if ntext:match(pat) then return false end
   end
 
-  -- Early comma?
-  local first_comma = raw:find(",")
-  local early_comma = first_comma and first_comma <= 80
+  -- Must have a comma relatively early (surname, Given …)
+  local first_comma = text:find(",")
+  if not first_comma or first_comma > 80 then return false end
 
-  -- Caps run before comma (ASCII, good enough for most surnames)
-  local before = first_comma and raw:sub(1, first_comma - 1) or ""
-  local caps_run = before:match("%u%u+") ~= nil -- e.g., GAGNON, POLLARD
-
-  -- Has emphasized (italic) inlines (book/article titles)
+  -- Prefer references that include an italicized segment (title)
   local has_emph = false
   if para.t == "Para" or para.t == "Plain" then
     for _, inl in ipairs(para.content or {}) do
-      if inl.t == "Emph" then
-        has_emph = true
-        break
-      end
+      if inl.t == "Emph" then has_emph = true; break end
     end
   end
+  if not has_emph then return false end
 
-  if early_comma and (caps_run or has_emph) then
-    -- Also avoid very short lines like "Voir la section Livres"
-    if #raw_trim >= 40 then
-      return true
-    end
-  end
-  return false
+  -- Must contain a 4-digit year (1500–2099) somewhere
+  if not text:match("%f[%d](1[5-9]%d%d|20%d%d)%f[%D]") then return false end
+
+  -- Bonus signal: caps run before the first comma (SURNAME,)
+  local before = text:sub(1, first_comma - 1)
+  local caps_run = before:match("%u%u+") ~= nil
+
+  -- Final decision: all the strong signals, plus allow mixed-case surnames too
+  return true
 end
 
 function Pandoc(doc)
