@@ -80,10 +80,22 @@ jobs:
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
 
-- name: Debug: confirm ref-entry/title-mock
+- name: "Debug – confirm .ref-entry and .title-mock"
+  shell: bash
   run: |
-    grep -n 'class="ref-entry"' dist/index.html | head -n 20 || echo "no .ref-entry"
-    grep -n 'class="title-mock"' dist/index.html | head -n 5 || echo "no .title-mock"
+    set -e
+    echo '--- looking for .ref-entry ---'
+    if grep -n 'class="ref-entry"' dist/index.html | head -n 20; then
+      echo "found .ref-entry"
+    else
+      echo "no .ref-entry"
+    fi
+    echo '--- looking for .title-mock ---'
+    if grep -n 'class="title-mock"' dist/index.html | head -n 10; then
+      echo "found .title-mock"
+    else
+      echo "no .title-mock"
+    fi
 
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
