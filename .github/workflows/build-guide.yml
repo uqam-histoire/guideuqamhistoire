@@ -71,8 +71,9 @@ jobs:
           pandoc "Guide_1er_cycle_2025_VF.docx" \
                  -s -t html5 \
                  --section-divs \
+                 --lua-filter=assets/add-title-mock.lua \
                  --template=assets/pandoc.html5 \
-                 --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique – UQAM" \
+                 --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique" \
                  --metadata lang=fr \
                  --metadata date="${BUILD_DATE}" \
                  --toc --toc-depth=3 --number-sections \
