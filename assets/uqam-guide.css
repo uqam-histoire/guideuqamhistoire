@@ -67,22 +67,12 @@ body > p:nth-of-type(5) { color:#6b7280; font-size:.95rem; margin-bottom:.6rem; 
 .title-mock p:nth-of-type(4) strong { display:inline-block; font-weight:800; }
 .title-mock p:last-of-type { color:#6b7280; font-size:.95rem; }
 
-/* debug — remove after checking */
-section[id*="bibliographie"] section.level4 p { outline: 1px dotted #bbb; }
 
-/* ==== Hanging indents for bibliography entries ==== */
-
-/* ==== Hanging indents for bibliography entries (tagged by Lua) ==== */
+/* Hanging indents for tagged reference paragraphs */
 .ref-entry p {
   margin: 0 0 var(--para-after);
-  padding-left: 1.5em;
-  text-indent: -1.5em;
-}
-
-/* Safety net if Pandoc ever exposes a style class */
-p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
-  padding-left: 1.5em;
-  text-indent: -1.5em;
+  padding-left: 1.5em !important;
+  text-indent: -1.5em !important;
 }
 
 /* Print */
