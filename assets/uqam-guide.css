@@ -371,3 +371,6 @@ p.Rfrence, p.rfrence, p.Référence, p.référence, p.reference, p.Reference {
   padding-left: 1.4em;
   text-indent: -1.4em;
 }
+
+/* Hanging indent for tagged reference paragraphs */
+.ref-entry > p { padding-left: 1.4em; text-indent: -1.4em; }
