@@ -24,7 +24,9 @@ end
 -- We also exclude typical explanatory starters ("si ", "voir ", "de plus", etc.)
 -- Heuristic: return true only for paragraphs that look like references
 -- Heuristic: return true for paragraphs that look like bibliography entries
+-- Heuristic: identify real bibliography entries, avoid explanatory lines
 local function has_year(text)
+  -- 1500–2099 (word boundaries so we don't match page numbers)
   return text:match("%f[%d]1[5-9]%d%d%f[%D]") or text:match("%f[%d]20%d%d%f[%D]")
 end
 
@@ -49,7 +51,15 @@ local function has_emph(para)
   return false
 end
 
-local function has_quotes(text)
+local function starts_with_caps_name(text, first_comma)
+  if not first_comma then return false end
+  local up = text:upper()
+  local before = up:sub(1, first_comma - 1)            -- e.g., "POLLARD" or "PRDH"
+  -- allow letters (incl. diacritics), spaces, hyphen, apostrophe, dot
+  return before:match("^[%uÀ-ÖØ-Þ%s%-%.'']+$") ~= nil and #before:gsub("%s+", "") >= 2
+end
+
+local function has_quoted_title(text)
   return text:find("«") or text:find("»") or text:find("“") or text:find("”") or text:find("\"")
 end
 
@@ -59,21 +69,31 @@ local function is_reference_para(para)
   local text = (raw:gsub("%s+", " "):match("^%s*(.-)%s*$") or "")
   local ntext = norm(text)
 
-  -- obvious non-reference openers
-  local starters = { "^si ", "^voir ", "^de plus", "^par exemple", "^nota", "^remarque", "^attention", "^on " }
+  -- Obvious non-reference openers (expandable)
+  local starters = {
+    "^si ", "^voir ", "^de plus", "^par exemple", "^nota", "^remarque",
+    "^attention", "^on ", "^pour ", "^dans le cas", "^lorsqu", "^lorsque "
+  }
   for _, pat in ipairs(starters) do
     if ntext:match(pat) then return false end
   end
 
-  -- need a comma relatively early (SURNAME, Given …)
+  -- Must have an early comma (author/acronym, then comma)
   local first_comma = text:find(",")
-  if not first_comma or first_comma > 120 then return false end
+  if not first_comma or first_comma > 80 then return false end
 
-  -- accept ANY of these “evidence” signals (covers books, newspapers, maps, DBs, blogs…)
-  local evidence = has_emph(para) or has_quotes(text) or has_year(text) or has_ext_link(para)
-  if not evidence then return false end
+  -- Must have a year or a DOI/URL somewhere (exclude plain explanations)
+  local has_dateish = has_year(text) or has_ext_link(para)
+  if not has_dateish then return false end
 
-  -- avoid very short fragments
+  -- Require one strong "title/author" signal
+  local strong_signal =
+      starts_with_caps_name(text, first_comma) or  -- SURNAME/ACRONYM before comma
+      has_emph(para) or                            -- italicised title
+      has_quoted_title(text)                       -- quoted title
+  if not strong_signal then return false end
+
+  -- Avoid very short fragments
   if #text < 40 then return false end
 
   return true
