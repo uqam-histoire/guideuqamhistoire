@@ -47,7 +47,33 @@ jobs:
             --convert-to "pdf:writer_pdf_Export:EmbedStandardFonts=true;ExportBookmarks=true;SelectPdfVersion=1" \
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
+            
+      - name: Install poppler-utils
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
 
+      - name: Find annex pages & render PNGs (optional)
+        env:
+          PDF: dist/Guide_1er_cycle_2025_VF.pdf
+        run: |
+          set -e
+          pages=$(pdfinfo "$PDF" | awk '/Pages:/ {print $2}')
+          find_page() { phrase="$1"; for i in $(seq 1 "$pages"); do
+              if pdftotext -f "$i" -l "$i" "$PDF" - | grep -Eqi "$phrase"; then echo "$i"; return; fi
+            done; echo ""; }
+          TITLE_PAGE=$(find_page "Université du Québec à Montréal|Mod[èe]le de page titre")
+          TOC_PAGE=$(find_page "^ *Table des mati[èe]res|Mod[èe]le de table des mati[èe]res")
+          echo "TITLE_PAGE=$TITLE_PAGE" >> $GITHUB_ENV
+          echo "TOC_PAGE=$TOC_PAGE" >> $GITHUB_ENV
+          mkdir -p dist/images
+          if [ -n "$TITLE_PAGE" ]; then
+            pdftoppm -f "$TITLE_PAGE" -l "$TITLE_PAGE" -png -rx 220 -ry 220 "$PDF" dist/images/annex-title
+            mv "dist/images/annex-title-$TITLE_PAGE.png" dist/images/annex-title.png
+          fi
+          if [ -n "$TOC_PAGE" ]; then
+            pdftoppm -f "$TOC_PAGE" -l "$TOC_PAGE" -png -rx 220 -ry 220 "$PDF" dist/images/annex-toc
+            mv "dist/images/annex-toc-$TOC_PAGE.png" dist/images/annex-toc.png
+          fi
+          
       # (Optional) Set PDF metadata (Title/Author/Subject)
       - name: Install exiftool
         run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
@@ -84,6 +110,26 @@ jobs:
                  --toc --toc-depth=3 --number-sections \
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
+
+      - name: Replace Annex blocks with image or PDF link
+        run: |
+          # Title page mock
+          if [ -f dist/images/annex-title.png ]; then
+            perl -0777 -i -pe 's|<div class="title-mock">.*?</div>|<figure class="annex-figure"><img src="images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|s' dist/index.html
+          elif [ -n "${TITLE_PAGE}" ]; then
+            perl -0777 -i -pe 's|<div class="title-mock">.*?</div>|<div class="annex-note">Modèle de page titre : voir le <a href="Guide_1er_cycle_2025_VF.pdf#page='${TITLE_PAGE}'">PDF (page '${TITLE_PAGE}')</a>.</div>|s' dist/index.html
+          else
+            perl -0777 -i -pe 's|<div class="title-mock">.*?</div>|<div class="annex-note">Modèle de page titre : voir le <a href="Guide_1er_cycle_2025_VF.pdf">PDF</a>.</div>|s' dist/index.html
+          fi
+
+          # ToC mock
+          if [ -f dist/images/annex-toc.png ]; then
+            perl -0777 -i -pe 's|<div class="toc-mock">.*?</div>|<figure class="annex-figure"><img src="images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|s' dist/index.html
+          elif [ -n "${TOC_PAGE}" ]; then
+            perl -0777 -i -pe 's|<div class="toc-mock">.*?</div>|<div class="annex-note">Modèle de table des matières : voir le <a href="Guide_1er_cycle_2025_VF.pdf#page='${TOC_PAGE}'">PDF (page '${TOC_PAGE}')</a>.</div>|s' dist/index.html
+          else
+            perl -0777 -i -pe 's|<div class="toc-mock">.*?</div>|<div class="annex-note">Modèle de table des matières : voir le <a href="Guide_1er_cycle_2025_VF.pdf">PDF</a>.</div>|s' dist/index.html
+          fi
 
       - name: Debug confirm ref-entry and title-mock
         run: |
