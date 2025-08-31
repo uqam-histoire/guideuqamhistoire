@@ -17,30 +17,50 @@ end
 local function is_biblio_heading(txt) return norm(txt):match("bibliographie") end
 
 -- Robust reference detector used in most 2.4.2 subsections
-local function has_year(text)
-  return text:match("%f[%d]1[5-9]%d%d%f[%D]") or text:match("%f[%d]20%d%d%f[%D]")
+-- Heuristic: identify real bibliography entries, avoid explanatory lines
+local function has_year_or_century(text)
+  -- 1500–2099 (standalone) or ranges like 1999–… / 2022-…
+  if text:match("%f[%d]1[5-9]%d%d%f[%D]") or text:match("%f[%d]20%d%d%f[%D]") then
+    return true
+  end
+  if text:match("1[5-9]%d%d[%-%–]") or text:match("20%d%d[%-%–]") then
+    return true
+  end
+  -- French century mentions: Xe siècle / XVIIe siècle / XVIIe s.
+  if text:match("[%uXIVLCDM]+%s*[%^]?[eE]?%s*si[èe]cle") or text:match("[%uXIVLCDM]+e?%s*s%.") then
+    return true
+  end
+  return false
 end
+
 local function has_ext_link(para)
   if para.t ~= "Para" and para.t ~= "Plain" then return false end
   for _, inl in ipairs(para.content or {}) do
     if inl.t == "Link" then
       local tgt = inl.target and inl.target[1] or ""
-      if tgt:match("^https?://") or tgt:match("^doi%.org") or tgt:match("^dx%.doi%.org") then return true end
+      if tgt:match("^https?://") or tgt:match("^doi%.org") or tgt:match("^dx%.doi%.org") then
+        return true
+      end
     end
   end
   return false
 end
+
 local function has_emph(para)
   if para.t ~= "Para" and para.t ~= "Plain" then return false end
-  for _, inl in ipairs(para.content or {}) do if inl.t == "Emph" then return true end end
+  for _, inl in ipairs(para.content or {}) do
+    if inl.t == "Emph" then return true end
+  end
   return false
 end
+
 local function starts_with_caps_name(text, first_comma)
   if not first_comma then return false end
   local up = text:upper()
   local before = up:sub(1, first_comma - 1)
   return before:match("^[%uÀ-ÖØ-Þ%s%-%.'']+$") ~= nil and #before:gsub("%s+","") >= 2
 end
+
 local function has_quoted_title(text)
   return text:find("«") or text:find("»") or text:find("“") or text:find("”") or text:find('"')
 end
@@ -51,17 +71,25 @@ local function is_reference_para(para)
   local text = (raw:gsub("%s+", " "):match("^%s*(.-)%s*$") or "")
   local ntext = norm(text)
 
-  -- skip obvious explanatory openers
-  local starters = { "^si ", "^voir ", "^de plus", "^par exemple", "^nota", "^remarque",
-                     "^attention", "^on ", "^pour ", "^dans le cas", "^lorsqu", "^lorsque " }
-  for _, pat in ipairs(starters) do if ntext:match(pat) then return false end end
+  -- Exclude obvious non-reference openers
+  local starters = {
+    "^si ", "^voir ", "^de plus", "^par exemple", "^nota", "^remarque",
+    "^attention", "^on ", "^pour ", "^dans le cas", "^lorsqu", "^lorsque ",
+    "^nom du", "^nom des", "^auteur", "^autrice"
+  }
+  for _, pat in ipairs(starters) do
+    if ntext:match(pat) then return false end
+  end
 
+  -- Must have an early comma (author/org then comma)
   local first_comma = text:find(",")
-  if not first_comma or first_comma > 80 then return false end
+  if not first_comma or first_comma > 120 then return false end
 
-  local has_dateish = has_year(text) or has_ext_link(para)
-  if not has_dateish then return false end
+  -- Must also show some "dateish" proof (year/range/century OR URL/DOI)
+  local dateish = has_year_or_century(text) or has_ext_link(para)
+  if not dateish then return false end
 
+  -- And one strong title/author signal
   local strong = starts_with_caps_name(text, first_comma) or has_emph(para) or has_quoted_title(text)
   if not strong then return false end
 
