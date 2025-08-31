@@ -23,40 +23,59 @@ end
 --   B) presence of emphasized (italic) text (the title) AND a comma early
 -- We also exclude typical explanatory starters ("si ", "voir ", "de plus", etc.)
 -- Heuristic: return true only for paragraphs that look like references
+-- Heuristic: return true for paragraphs that look like bibliography entries
+local function has_year(text)
+  return text:match("%f[%d]1[5-9]%d%d%f[%D]") or text:match("%f[%d]20%d%d%f[%D]")
+end
+
+local function has_ext_link(para)
+  if para.t ~= "Para" and para.t ~= "Plain" then return false end
+  for _, inl in ipairs(para.content or {}) do
+    if inl.t == "Link" then
+      local tgt = inl.target and inl.target[1] or ""
+      if tgt:match("^https?://") or tgt:match("^doi%.org") or tgt:match("^dx%.doi%.org") then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+local function has_emph(para)
+  if para.t ~= "Para" and para.t ~= "Plain" then return false end
+  for _, inl in ipairs(para.content or {}) do
+    if inl.t == "Emph" then return true end
+  end
+  return false
+end
+
+local function has_quotes(text)
+  return text:find("«") or text:find("»") or text:find("“") or text:find("”") or text:find("\"")
+end
+
 local function is_reference_para(para)
   if not para or not para.t then return false end
-
-  local raw = pandoc.utils.stringify(para) or ""
-  local text = raw:gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
+  local raw  = pandoc.utils.stringify(para) or ""
+  local text = (raw:gsub("%s+", " "):match("^%s*(.-)%s*$") or "")
   local ntext = norm(text)
 
-  -- Exclude typical explanatory starters
+  -- obvious non-reference openers
   local starters = { "^si ", "^voir ", "^de plus", "^par exemple", "^nota", "^remarque", "^attention", "^on " }
   for _, pat in ipairs(starters) do
     if ntext:match(pat) then return false end
   end
 
-  -- Must have a comma relatively early (surname, Given …)
+  -- need a comma relatively early (SURNAME, Given …)
   local first_comma = text:find(",")
-  if not first_comma or first_comma > 80 then return false end
+  if not first_comma or first_comma > 120 then return false end
 
-  -- Prefer references that include an italicized segment (title)
-  local has_emph = false
-  if para.t == "Para" or para.t == "Plain" then
-    for _, inl in ipairs(para.content or {}) do
-      if inl.t == "Emph" then has_emph = true; break end
-    end
-  end
-  if not has_emph then return false end
+  -- accept ANY of these “evidence” signals (covers books, newspapers, maps, DBs, blogs…)
+  local evidence = has_emph(para) or has_quotes(text) or has_year(text) or has_ext_link(para)
+  if not evidence then return false end
 
-  -- Must contain a 4-digit year (1500–2099) somewhere
-  if not text:match("%f[%d](1[5-9]%d%d|20%d%d)%f[%D]") then return false end
+  -- avoid very short fragments
+  if #text < 40 then return false end
 
-  -- Bonus signal: caps run before the first comma (SURNAME,)
-  local before = text:sub(1, first_comma - 1)
-  local caps_run = before:match("%u%u+") ~= nil
-
-  -- Final decision: all the strong signals, plus allow mixed-case surnames too
   return true
 end
 
