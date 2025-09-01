@@ -95,6 +95,8 @@ jobs:
           # A) Try to replace our wrapper blocks if present
           perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html || true
           perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html || true
+          # Notes/quotations mock → image
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html
 
           # B) If wrappers weren’t there (no <img> refs yet), inject figures at the start of the Annexes section.
           if ! grep -q 'assets/images/annex-' dist/index.html; then
@@ -118,6 +120,28 @@ jobs:
           # Tiny log so you can verify immediately
           echo "HTML references now:"
           grep -n 'assets/images/annex-' dist/index.html || true          
+
+      - name: Ensure NOTES figure is present (fallback if wrapper missing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES='<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>'
+
+          # Only insert if not already referenced
+          if ! grep -q 'assets/images/annex-notes.png' dist/index.html; then
+            if grep -q 'assets/images/annex-toc.png' dist/index.html; then
+              # Insert right after the TOC figure
+              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-toc\\.png.*?</figure> )|\\1\n${NOTES}|gs" dist/index.html
+            elif grep -q 'assets/images/annex-title.png' dist/index.html; then
+              # Else insert after the Title figure
+              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-title\\.png.*?</figure> )|\\1\n${NOTES}|gs" dist/index.html
+            else
+              # Last resort: inject at the start of the Annexes section
+              perl -0777 -i -pe "s|(<section[^>]*id=\"annexes\"[^>]*>)|\\1\n${NOTES}\n|s" dist/index.html
+            fi
+          fi
+
+          echo "Annex images now referenced:"; grep -n 'assets/images/annex-' dist/index.html || true
     
       # Quick sanity check after replacement
       - name: Debug verify images and HTML refs
