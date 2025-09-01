@@ -30,14 +30,14 @@ jobs:
           sudo fc-cache -f -v
           fc-list | grep -i "Times New Roman" || true
 
-      # Copy only what we publish (CSS + annex images)
+      # Copy only what we publish (CSS + images)
       - name: Prepare dist and copy assets
         run: |
           set -e
           mkdir -p dist/assets/images
           # CSS
           cp assets/*.css dist/assets/ 2>/dev/null || true
-          # Images (your two PNGs now in assets/images/)
+          # Images (annex-*.png under assets/images/)
           cp assets/images/* dist/assets/images/ 2>/dev/null || true
           echo "Published assets:"; ls -la dist/assets || true
           echo "Published images:"; ls -la dist/assets/images || true
@@ -86,69 +86,33 @@ jobs:
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
 
-      # Swap Annex mock blocks for the static PNGs
-      - name: Replace Annex blocks with static images (with fallback)
+      # Ensure all three Annex figures are present:
+      # 1) replace wrappers if present; 2) inject any missing figures at the start of #annexes
+      - name: Ensure Annex figures (replace if present, otherwise inject)
         shell: bash
         run: |
           set -euo pipefail
+          html="dist/index.html"
 
-          # A) Try to replace our wrapper blocks if present
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html || true
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html || true
-          # Notes/quotations mock → image
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html
+          # 1) Replace wrapper blocks if present
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html"
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html"
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html"
 
-          # B) If wrappers weren’t there (no <img> refs yet), inject figures at the start of the Annexes section.
-          if ! grep -q 'assets/images/annex-' dist/index.html; then
-            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' dist/index.html
+          # 2) Inject any missing figures at the start of the Annexes section (order: title, TOC, notes)
+          if ! grep -q 'assets/images/annex-title.png' "$html"; then
+            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html"
+          fi
+          if ! grep -q 'assets/images/annex-toc.png' "$html"; then
+            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html"
+          fi
+          if ! grep -q 'assets/images/annex-notes.png' "$html"; then
+            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html"
           fi
 
-      - name: Ensure TOC figure is present (fallback if wrapper missing)
-        shell: bash
-        run: |
-          set -euo pipefail
-          # If the TOC image isn't referenced yet, insert it.
-          if ! grep -q 'assets/images/annex-toc.png' dist/index.html; then
-            # Try to place it immediately after the title figure if that exists…
-            perl -0777 -i -pe 's|(</figure>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|s' dist/index.html
-            # …but if there was no title figure to anchor to, inject at the start of the Annexes section.
-            if ! grep -q 'assets/images/annex-toc.png' dist/index.html; then
-              perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' dist/index.html
-            fi
-          fi
+          echo "Annex images referenced:"
+          grep -n 'assets/images/annex-' "$html" || true
 
-          # Tiny log so you can verify immediately
-          echo "HTML references now:"
-          grep -n 'assets/images/annex-' dist/index.html || true          
-
-      - name: Ensure NOTES figure is present (fallback if wrapper missing)
-        shell: bash
-        run: |
-          set -euo pipefail
-          NOTES='<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>'
-
-          # Only insert if not already referenced
-          if ! grep -q 'assets/images/annex-notes.png' dist/index.html; then
-            if grep -q 'assets/images/annex-toc.png' dist/index.html; then
-              # Insert right after the TOC figure
-              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-toc\\.png.*?</figure> )|\\1\n${NOTES}|gs" dist/index.html
-            elif grep -q 'assets/images/annex-title.png' dist/index.html; then
-              # Else insert after the Title figure
-              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-title\\.png.*?</figure> )|\\1\n${NOTES}|gs" dist/index.html
-            else
-              # Last resort: inject at the start of the Annexes section
-              perl -0777 -i -pe "s|(<section[^>]*id=\"annexes\"[^>]*>)|\\1\n${NOTES}\n|s" dist/index.html
-            fi
-          fi
-
-          echo "Annex images now referenced:"; grep -n 'assets/images/annex-' dist/index.html || true
-    
-      # Quick sanity check after replacement
-      - name: Debug verify images and HTML refs
-        run: |
-          echo "Images in site bundle:"; ls -la dist/assets/images || true
-          echo "HTML references:"; grep -n 'assets/images/annex-' dist/index.html || echo "no <img> refs found"
-    
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -156,3 +120,5 @@ jobs:
           publish_dir: dist
           publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # If you later add a custom domain, uncomment:
+          # cname: guide.histoire.uqam.ca
