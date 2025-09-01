@@ -115,6 +115,24 @@ function Pandoc(doc)
         table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"toc-mock"})))
         i = j
 
+      -- (C) Wrap the "Exemple de texte avec appels de notes et citations"
+      --     sample by detecting its first visible line
+      elseif t:match("^exemple de texte") or t:match("^exemple de texte avec appels de notes") then
+        local j, collected, count = i, {}, 1
+        while j <= #src do
+          local nb = src[j]
+          if nb.t == "Header" then break end
+          local ntext = norm(pandoc.utils.stringify(nb))
+          -- stop if we hit the start of another annex sample
+          if ntext:match("^modele de table des matieres")
+            or ntext:match("^universite du quebec a montreal") then break end
+          table.insert(collected, nb)
+          count = count + 1; if count > 80 then break end
+          j = j + 1
+        end
+        table.insert(out, pandoc.Div(collected, pandoc.Attr("", {"notes-mock"})))
+        i = j
+
       else
         table.insert(out, b); i = i + 1
       end
