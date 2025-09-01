@@ -51,34 +51,53 @@ jobs:
       - name: Install poppler-utils
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
 
-      - name: Find annex pages & render PNGs (optional)
+      - name: Find annex pages & render PNGs (robust)
+        shell: bash
         env:
           PDF: dist/Guide_1er_cycle_2025_VF.pdf
-        shell: bash
         run: |
           set -euo pipefail
+          export LC_ALL=C.UTF-8
+
           pages=$(pdfinfo "$PDF" | awk '/Pages:/ {print $2}')
+
           find_page() {
             local phrase="$1"
             for i in $(seq 1 "$pages"); do
-              if pdftotext -f "$i" -l "$i" "$PDF" - | grep -Eqi "$phrase"; then
+              # Extract only page i; search with tolerant, UTF-8 aware regex
+              if pdftotext -f "$i" -l "$i" -enc UTF-8 "$PDF" - | tr -d '\r' | grep -Eqi "$phrase"; then
                 echo "$i"; return 0
               fi
             done
             echo ""; return 1
           }
-          TITLE_PAGE=$(find_page "Université du Québec à Montréal|Mod[èe]le de page titre")
-          TOC_PAGE=$(find_page "^ *Table des mati[èe]res|Mod[èe]le de table des mati[èe]res")
-          echo "TITLE_PAGE=${TITLE_PAGE}" >> "$GITHUB_ENV"
-          echo "TOC_PAGE=${TOC_PAGE}"       >> "$GITHUB_ENV"
+
+          # Title page cues (either the university head or “Modèle de page titre”)
+          TITLE_PAGE=$(find_page "Universit[ée] du Qu[ée]bec [àa] Montr[ée]al|Mod[èe][l|1]e de page titre")
+
+          # TOC cues (cover accents, caps, with/without “Modèle de …”)
+          PAT1="(^|[[:space:]])table[[:space:]]+des[[:space:]]+mati(è|e|é)res([[:space:][:punct:]]|$)"
+          PAT2="mod(è|e|é)le[[:space:]]+de[[:space:]]+table[[:space:]]+des[[:space:]]+mati(è|e|é)res"
+          PAT3="^ *TABLE[[:space:]]+DES[[:space:]]+MATI(È|E|É)RES *$"
+
+          TOC_PAGE=$(find_page "$PAT1")
+          if [ -z "${TOC_PAGE}" ]; then TOC_PAGE=$(find_page "$PAT2"); fi
+          if [ -z "${TOC_PAGE}" ]; then TOC_PAGE=$(find_page "$PAT3"); fi
+
+          # Fallback: if TOC still empty but title found, try title+1
+          if [ -z "${TOC_PAGE:-}" ] && [ -n "${TITLE_PAGE:-}" ]; then
+            cand=$(( TITLE_PAGE + 1 ))
+            if [ "$cand" -le "$pages" ]; then TOC_PAGE="$cand"; fi
+          fi
+
+          echo "TITLE_PAGE=${TITLE_PAGE:-}" >> "$GITHUB_ENV"
+          echo "TOC_PAGE=${TOC_PAGE:-}"     >> "$GITHUB_ENV"
 
           mkdir -p dist/images
-
-          if [ -n "${TITLE_PAGE}" ]; then
-            # Write a single, deterministic file: dist/images/annex-title.png
+          if [ -n "${TITLE_PAGE:-}" ]; then
             pdftoppm -singlefile -f "$TITLE_PAGE" -l "$TITLE_PAGE" -png "$PDF" dist/images/annex-title || true
           fi
-          if [ -n "${TOC_PAGE}" ]; then
+          if [ -n "${TOC_PAGE:-}" ]; then
             pdftoppm -singlefile -f "$TOC_PAGE" -l "$TOC_PAGE" -png "$PDF" dist/images/annex-toc || true
           fi
 
