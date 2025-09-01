@@ -42,7 +42,7 @@ jobs:
           ls -la dist/assets || true
           ls -la dist/assets/images || true
 
-      - name: Debug: verify images & HTML refs
+      - name: Debug verify images and HTML refs
         run: |
           echo "Images in site bundle:"
           ls -la dist/assets/images || true
