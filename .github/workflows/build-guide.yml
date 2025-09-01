@@ -37,7 +37,7 @@ jobs:
           mkdir -p dist/assets/images
           # CSS
           cp assets/*.css dist/assets/ 2>/dev/null || true
-          # Images (annex-title.png / annex-toc.png) in assets/images/
+          # Images (your two PNGs now in assets/images/)
           cp assets/images/* dist/assets/images/ 2>/dev/null || true
           echo "Published assets:"; ls -la dist/assets || true
           echo "Published images:"; ls -la dist/assets/images || true
@@ -87,21 +87,26 @@ jobs:
                  -o dist/index.html
 
       # Swap Annex mock blocks for the static PNGs
-      - name: Replace Annex blocks with static images
+      - name: Replace Annex blocks with static images (with fallback)
         shell: bash
         run: |
           set -euo pipefail
-          # Title page mock → image
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html
-          # TOC mock → image
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html
 
+          # A) Try to replace our wrapper blocks if present
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html || true
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' dist/index.html || true
+
+          # B) If wrappers weren’t there (no <img> refs yet), inject figures at the start of the Annexes section.
+          if ! grep -q 'assets/images/annex-' dist/index.html; then
+            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' dist/index.html
+          fi
+    
       # Quick sanity check after replacement
-      - name: Debug annex images referenced
+      - name: Debug verify images and HTML refs
         run: |
           echo "Images in site bundle:"; ls -la dist/assets/images || true
           echo "HTML references:"; grep -n 'assets/images/annex-' dist/index.html || echo "no <img> refs found"
-
+    
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
