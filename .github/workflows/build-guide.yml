@@ -36,12 +36,11 @@ jobs:
           mkdir -p dist/assets/images
           # CSS
           cp assets/*.css dist/assets/ 2>/dev/null || true
-          # Images (your two PNGs now in assets/images/)
+          # Images (annex-title.png / annex-toc.png) – now under assets/images/
           cp assets/images/* dist/assets/images/ 2>/dev/null || true
-          echo "Published assets:"
-          ls -la dist/assets || true
-          ls -la dist/assets/images || true
-
+          echo "Published assets:"; ls -la dist/assets || true
+          echo "Published images:"; ls -la dist/assets/images || true
+    
       - name: Debug verify images and HTML refs
         run: |
           echo "Images in site bundle:"
@@ -105,9 +104,9 @@ jobs:
 
       # (Optional) Quick sanity check in logs
       - name: Debug annex images referenced
-        run: |
-          echo "Image refs in HTML:"
-          grep -n 'assets/images/annex-' dist/index.html || true
+      run: |
+      echo "Images in site bundle:"; ls -la dist/assets/images || true
+      echo "HTML references:"; grep -n 'assets/images/annex-' dist/index.html || echo "no <img> refs found"
 
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
