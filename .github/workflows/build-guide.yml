@@ -100,6 +100,24 @@ jobs:
           if ! grep -q 'assets/images/annex-' dist/index.html; then
             perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' dist/index.html
           fi
+
+      - name: Ensure TOC figure is present (fallback if wrapper missing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # If the TOC image isn't referenced yet, insert it.
+          if ! grep -q 'assets/images/annex-toc.png' dist/index.html; then
+            # Try to place it immediately after the title figure if that exists…
+            perl -0777 -i -pe 's|(</figure>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|s' dist/index.html
+            # …but if there was no title figure to anchor to, inject at the start of the Annexes section.
+            if ! grep -q 'assets/images/annex-toc.png' dist/index.html; then
+              perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' dist/index.html
+            fi
+          fi
+
+          # Tiny log so you can verify immediately
+          echo "HTML references now:"
+          grep -n 'assets/images/annex-' dist/index.html || true          
     
       # Quick sanity check after replacement
       - name: Debug verify images and HTML refs
