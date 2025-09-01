@@ -30,18 +30,25 @@ jobs:
           sudo fc-cache -f -v
           fc-list | grep -i "Times New Roman" || true
 
-      # Prepare dist and copy only the assets we actually publish (CSS + images)
       - name: Prepare dist and copy assets
         run: |
           set -e
           mkdir -p dist/assets/images
-          # CSS (if none, don't fail)
+          # CSS
           cp assets/*.css dist/assets/ 2>/dev/null || true
-          # Images (annex-title.png / annex-toc.png)
+          # Images (your two PNGs now in assets/images/)
           cp assets/images/* dist/assets/images/ 2>/dev/null || true
+          echo "Published assets:"
           ls -la dist/assets || true
           ls -la dist/assets/images || true
 
+      - name: Debug: verify images & HTML refs
+        run: |
+          echo "Images in site bundle:"
+          ls -la dist/assets/images || true
+          echo "HTML references:"
+          grep -n 'assets/images/annex-' dist/index.html || true
+    
       # Build date for cache-busting in the template
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
