@@ -86,31 +86,23 @@ jobs:
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
 
-      # Ensure all three Annex figures are present:
-      # 1) replace wrappers if present; 2) inject any missing figures at the start of #annexes
-      - name: Ensure Annex figures (replace if present, otherwise inject)
+      # Normalize Annex subsections: keep headings; replace their content with the correct image figure
+      - name: Place Annex figures under their headings (and remove text mockups)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
 
-          # 1) Replace wrapper blocks if present
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html"
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html"
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html"
+          # 1) Modèle de page titre
+          perl -0777 -i -pe 's{(<h[1-6][^>]*>\s*Mod[èe]le\s+de\s+page\s+titre.*?</h[1-6]>)(?s).*?(?=(?:<h[1-6]|</section>))}{$1\n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n}ig' "$html"
 
-          # 2) Inject any missing figures at the start of the Annexes section (order: title, TOC, notes)
-          if ! grep -q 'assets/images/annex-title.png' "$html"; then
-            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html"
-          fi
-          if ! grep -q 'assets/images/annex-toc.png' "$html"; then
-            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html"
-          fi
-          if ! grep -q 'assets/images/annex-notes.png' "$html"; then
-            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html"
-          fi
+          # 2) Modèle de table des matières
+          perl -0777 -i -pe 's{(<h[1-6][^>]*>\s*Mod[èe]le\s+de\s+table\s+des\s+mati[èe]res.*?</h[1-6]>)(?s).*?(?=(?:<h[1-6]|</section>))}{$1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n}ig' "$html"
 
-          echo "Annex images referenced:"
+          # 3) Exemple de texte avec appels de notes et citations
+          perl -0777 -i -pe 's{(<h[1-6][^>]*>\s*Exemple\s+de\s+texte\s+avec\s+appels\s+de\s+notes.*?</h[1-6]>)(?s).*?(?=(?:<h[1-6]|</section>))}{$1\n<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n}ig' "$html"
+
+          echo "Annex images referenced (should be 3 entries below):"
           grep -n 'assets/images/annex-' "$html" || true
 
       # Publish to GitHub Pages (gh-pages branch)
