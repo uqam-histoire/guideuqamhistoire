@@ -138,6 +138,24 @@ jobs:
           echo "Annex images now referenced (expect title, toc, notes):"
           grep -n 'assets/images/annex-' "$html" || true
 
+      - name: Remove stray Annex III footnotes (4 & 5)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # 1) Remove by id if numbers are stable
+          perl -0777 -i -pe 's#\s*<li id="fn4">.*?</li>\s*##gs' "$html" || true
+          perl -0777 -i -pe 's#\s*<li id="fn5">.*?</li>\s*##gs' "$html" || true
+
+          # 2) Also remove by content (in case numbering shifts later)
+          perl -0777 -i -pe 's#\s*<li id="fn\d+">(?:(?:(?!</li>).)*?(Louis\s+Buade\s+de\s+Frontenac|Jean[-\s]?Baptiste\s+Colbert).+?)</li>\s*##gs' "$html" || true
+
+          # 3) Sanity check
+          echo "Remaining footnotes:"
+          grep -n '<li id="fn' "$html" || true
+
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
