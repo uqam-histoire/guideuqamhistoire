@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install tools + Times New Roman for faithful PDF
+      # Tools + Times New Roman for faithful PDF
       - name: Install converters & fonts
         run: |
           sudo apt-get update
@@ -35,14 +35,12 @@ jobs:
         run: |
           set -e
           mkdir -p dist/assets/images
-          # CSS
           cp assets/*.css dist/assets/ 2>/dev/null || true
-          # Images (annex-*.png under assets/images/)
           cp assets/images/* dist/assets/images/ 2>/dev/null || true
           echo "Published assets:"; ls -la dist/assets || true
           echo "Published images:"; ls -la dist/assets/images || true
 
-      # Build date for cache-busting in the template
+      # Build date for footer
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
 
@@ -54,7 +52,7 @@ jobs:
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
 
-      # (Optional) Set PDF metadata (Title/Author/Subject)
+      # Set PDF metadata (Title/Author/Subject)
       - name: Install exiftool
         run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
       - name: Set PDF metadata
@@ -71,7 +69,7 @@ jobs:
             dist/Guide_1er_cycle_2025_VF.pdf
           exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
 
-      # DOCX → HTML (mobile) using your template + Lua filter
+      # DOCX → HTML (mobile) using template + Lua filter
       - name: Convert DOCX to HTML (Pandoc)
         run: |
           pandoc "Guide_1er_cycle_2025_VF.docx" \
@@ -86,109 +84,47 @@ jobs:
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
 
-      # Replace wrappers if present, then try section-ID anchored placement, then fallback injects
-      - name: Ensure Annex figures (robust placement)
+      # Anchor each Annex figure under its own <section id="...">; remove mock text
+      - name: Anchor Annex figures under their sections (final placement)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
 
-          # --- 1) Replace wrapper blocks if present (non-fatal if absent) ---
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
-          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
-
-          # --- 2) Place figures inside their own sections by SECTION ID, keeping heading and removing mock text ---
-          # (Pandoc makes ASCII ids: accents stripped, lowercase, spaces→hyphens)
-          place_in_section() {
-            local sec_id="$1" img="$2" alt="$3"
-            # Replace everything after the section's heading up to </section> with the figure
-            perl -0777 -i -pe "s{(<section[^>]*id=\\\"${sec_id}\\\"[^>]*>\\s*<h[1-6][^>]*>.*?</h[1-6]>)(?s).*?(</section>)}{\\1\\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\\n\\2}i" \"$html\" || true
+          # Helper: place figure inside the section whose id CONTAINS a tolerant slug
+          place_by_id() {
+            local idpat="$1" img="$2" alt="$3"
+            perl -0777 -i -pe "s{
+              (<section[^>]*\\bid=\\\"[^\\\"]*${idpat}[^\\\"]*\\\"[^>]*>\\s*<h[1-6][^>]*>.*?</h[1-6]>)
+              (?s).*?
+              (</section>)
+            }{\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n\\2}igx" "$html" || true
           }
-          place_in_section "modele-de-page-titre" "assets/images/annex-title.png" "Modèle de page titre (image)"
-          place_in_section "modele-de-table-des-matieres" "assets/images/annex-toc.png" "Modèle de table des matières (image)"
-          place_in_section "exemple-de-texte-avec-appels-de-notes-et-citations" "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
 
-          # --- 3) Final fallback: if any figure still missing, inject at start of the Annexes section in the correct order ---
+          # Title page
+          place_by_id "modele[- ]?de[- ]?page[- ]?titre" \
+            "assets/images/annex-title.png" "Modèle de page titre (image)"
+
+          # Table des matières
+          place_by_id "modele[- ]?de[- ]?table[- ]?des[- ]?matieres" \
+            "assets/images/annex-toc.png" "Modèle de table des matières (image)"
+
+          # Notes / citations
+          place_by_id "exemple[- ]?de[- ]?texte[- ]?avec[- ]?appels[- ]?de[- ]?notes.*citations" \
+            "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
+
+          # Final fallback: if any image still missing, inject at top of "annexes" section
           ensure_at_top() {
             local img="$1" alt="$2"
-            if ! grep -q "$img" "$html"; then
-              perl -0777 -i -pe "s|(<section[^>]*id=\\\"annexes\\\"[^>]*>)|\\1\\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\\n|s" \"$html\"
-            fi
+            grep -q "$img" "$html" || \
+              perl -0777 -i -pe "s|(<section[^>]*id=\\\"annexes\\\"[^>]*>)|\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s" "$html"
           }
           ensure_at_top "assets/images/annex-title.png" "Modèle de page titre (image)"
           ensure_at_top "assets/images/annex-toc.png"   "Modèle de table des matières (image)"
           ensure_at_top "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
 
-          echo "Annex images referenced (should list title/toc/notes):"
+          echo "Annex images now referenced:"
           grep -n 'assets/images/annex-' "$html" || true
-
-      - name: Ensure TOC figure sits between Title and Notes (no heredoc)
-        shell: bash
-        run: |
-          set -euo pipefail
-          html="dist/index.html"
-
-          # If TOC missing, try to insert it between Title and Notes,
-          # then fall back to after Title, then at top of Annexes.
-          if ! grep -q 'assets/images/annex-toc.png' "$html"; then
-            # Between Title and Notes
-            perl -0777 -i -pe 's|( <figure[^>]*>.*?assets/images/annex-title\.png.*?</figure> )(.*?)( <figure[^>]*>.*?assets/images/annex-notes\.png.*?</figure> )|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n\3|s' "$html" || true
-            # After Title
-            grep -q 'assets/images/annex-toc.png' "$html" || \
-            perl -0777 -i -pe 's|( <figure[^>]*>.*?assets/images/annex-title\.png.*?</figure> )|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|s' "$html" || true
-            # At start of Annexes
-            grep -q 'assets/images/annex-toc.png' "$html" || \
-            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html" || true
-          fi
-
-          echo "Annex images now:"; grep -n 'assets/images/annex-' "$html" || true
-
-      - name: Ensure TOC figure exists and sits between Title and Notes
-        shell: bash
-        run: |
-          set -euo pipefail
-          html="dist/index.html"
-          TOC='<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>'
-
-          # 1) If TOC is missing, insert it in the best spot
-          if ! grep -q 'assets/images/annex-toc.png' "$html"; then
-            if grep -q 'assets/images/annex-notes.png' "$html"; then
-              # Insert TOC immediately BEFORE the Notes figure
-              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-notes\\.png.*?</figure> )|${TOC}\n\\1|s" "$html"
-            elif grep -q 'assets/images/annex-title.png' "$html"; then
-              # Else insert TOC immediately AFTER the Title figure
-              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-title\\.png.*?</figure> )|\\1\n${TOC}|s" "$html"
-            else
-              # Last resort: put TOC at the start of the Annexes section
-              perl -0777 -i -pe "s|(<section[^>]*id=\"annexes\"[^>]*>)|\\1\n${TOC}\n|s" "$html"
-            fi
-          fi
-
-          # 2) If TOC exists but is AFTER Notes, move it before Notes (ensure Title, TOC, Notes order)
-          if grep -q 'assets/images/annex-toc.png' "$html" && grep -q 'assets/images/annex-notes.png' "$html"; then
-            # If the first occurrence of Notes comes before any TOC, move the first TOC to before Notes
-            if awk 'BEGIN{t=0;n=0} /annex-toc.png/{t=NR} /annex-notes.png/{n=NR; exit} END{exit !(n>0 && (t==0 || t>n))}' "$html"; then
-              # Remove the first TOC figure and reinsert before the first Notes figure
-              perl -0777 -i -pe 'my $m; s|( <figure[^>]*>.*?assets/images/annex-toc\.png.*?</figure> )|($m= $1), ""|es' "$html"
-              [ -n "${m-}" ] && perl -0777 -i -pe 's|( <figure[^>]*>.*?assets/images/annex-notes\.png.*?</figure> )|'"$m"'\n$1|s' "$html"
-            fi
-          fi
-
-          echo "Annex images now:"
-          grep -n 'assets/images/annex-' "$html" || true
-
-      - name: Final TOC anchoring (insert after its label if still missing)
-        shell: bash
-        run: |
-          set -euo pipefail
-          html="dist/index.html"
-          # Only act if the TOC image isn't there yet
-          if ! grep -q 'assets/images/annex-toc.png' "$html"; then
-            # Insert the figure immediately after the line "Modèle de table des matières"
-            perl -0777 -i -pe 's{(<(p|h[1-6]|li)[^>]*>\s*Mod(?:[èe]le)?\s+de\s+table\s+des\s+mati(?:[èe]res).*?</\2>)}{$1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>}i' "$html"
-          fi
-          echo "TOC figure present?"; grep -n 'assets/images/annex-toc.png' "$html" || true
 
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
