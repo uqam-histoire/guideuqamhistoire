@@ -52,6 +52,9 @@ jobs:
       - name: Install exiftool
         run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
 
+      - name: Install qpdf & poppler-utils
+        run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
+
       - name: Set PDF metadata
         env:
           PDF_TITLE: "Guide du programme d'histoire – UQAM"
@@ -63,6 +66,22 @@ jobs:
             -Keywords="UQAM, Histoire, Premier cycle, Guide" \
             dist/Guide_1er_cycle_2025_VF.pdf
           exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
+
+      - name: Drop blank page 3 if empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          pdf="dist/Guide_1er_cycle_2025_VF.pdf"
+
+          # Extract text from page 3; if there's none (only whitespace), drop page 3.
+          if [ "$(pdftotext -f 3 -l 3 "$pdf" - | tr -d '\f\r\n[:space:]' | wc -c)" -eq 0 ]; then
+            # Reassemble without page 3: 1-2,4..end
+            qpdf --empty --pages "$pdf" 1-2,4-z -- "${pdf%.pdf}.tmp.pdf"
+            mv -f "${pdf%.pdf}.tmp.pdf" "$pdf"
+            echo "Removed blank page 3."
+          else
+            echo "Page 3 not empty; leaving PDF unchanged."
+          fi
 
       - name: Convert DOCX to HTML (Pandoc)
         run: |
