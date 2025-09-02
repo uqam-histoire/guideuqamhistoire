@@ -84,16 +84,21 @@ jobs:
                  --css=assets/uqam-guide.css \
                  -o dist/index.html
 
-      # Anchor each Annex figure under its own <section id="...">; remove mock text
-      - name: Anchor Annex figures under their sections (final placement)
+      # Normalize Annexes: remove any old annex figures, then anchor each image under its section and snip text
+      - name: Normalize Annexes (order + prune text)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
 
-          # Helper: place figure inside the section whose id CONTAINS a tolerant slug
+          # 0) Remove ANY previously-inserted annex figures (clean slate)
+          perl -0777 -i -pe 's|<figure\s+class="annex-figure">.*?</figure>||gs' "$html"
+
+          # Helper: replace the BODY of a section (after its <h*> heading) with a single figure.
           place_by_id() {
             local idpat="$1" img="$2" alt="$3"
+            # Match a <section> whose id contains the tolerant slug.
+            # Keep the opening tag + heading, replace everything up to </section>.
             perl -0777 -i -pe "s{
               (<section[^>]*\\bid=\\\"[^\\\"]*${idpat}[^\\\"]*\\\"[^>]*>\\s*<h[1-6][^>]*>.*?</h[1-6]>)
               (?s).*?
@@ -101,29 +106,30 @@ jobs:
             }{\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n\\2}igx" "$html" || true
           }
 
-          # Title page
+          # 1) Place in DOCUMENT order (Title → TOC → Notes)
           place_by_id "modele[- ]?de[- ]?page[- ]?titre" \
             "assets/images/annex-title.png" "Modèle de page titre (image)"
 
-          # Table des matières
           place_by_id "modele[- ]?de[- ]?table[- ]?des[- ]?matieres" \
             "assets/images/annex-toc.png" "Modèle de table des matières (image)"
 
-          # Notes / citations
           place_by_id "exemple[- ]?de[- ]?texte[- ]?avec[- ]?appels[- ]?de[- ]?notes.*citations" \
             "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
 
-          # Final fallback: if any image still missing, inject at top of "annexes" section
-          ensure_at_top() {
+          # 2) Last resort: if a figure is still missing (its <img> not found anywhere),
+          #    inject it at the END of the Annexes section in the correct order.
+          inject_at_end_if_missing() {
             local img="$1" alt="$2"
-            grep -q "$img" "$html" || \
-              perl -0777 -i -pe "s|(<section[^>]*id=\\\"annexes\\\"[^>]*>)|\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s" "$html"
+            if ! grep -q "$img" "$html"; then
+              perl -0777 -i -pe "s|(</section>\\s*<!--\\s*end of annexes\\s*--> )|\\1|; s|(</section>)|<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n\\1| if (/id=\\\"annexes\\\"/ .. /<\\/section>/)" "$html" || \
+              perl -0777 -i -pe "s|(<section[^>]*id=\\\"annexes\\\"[^>]*>)(?s)(.*?)(</section>)|\\1\\2<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\\n\\3|s" "$html"
+            fi
           }
-          ensure_at_top "assets/images/annex-title.png" "Modèle de page titre (image)"
-          ensure_at_top "assets/images/annex-toc.png"   "Modèle de table des matières (image)"
-          ensure_at_top "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
+          inject_at_end_if_missing "assets/images/annex-title.png" "Modèle de page titre (image)"
+          inject_at_end_if_missing "assets/images/annex-toc.png"   "Modèle de table des matières (image)"
+          inject_at_end_if_missing "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
 
-          echo "Annex images now referenced:"
+          echo "Annex image refs now (expect title, toc, notes exactly once):"
           grep -n 'assets/images/annex-' "$html" || true
 
       # Publish to GitHub Pages (gh-pages branch)
@@ -133,5 +139,4 @@ jobs:
           publish_dir: dist
           publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # If you later add a custom domain, uncomment:
           # cname: guide.histoire.uqam.ca
