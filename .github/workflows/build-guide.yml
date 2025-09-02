@@ -123,36 +123,26 @@ jobs:
           echo "Annex images referenced (should list title/toc/notes):"
           grep -n 'assets/images/annex-' "$html" || true
 
-      - name: Ensure TOC figure sits between Title and Notes
+      - name: Ensure TOC figure sits between Title and Notes (no heredoc)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
 
-          # The figure HTML we want to insert
-          TOC=$(cat <<'HTML'
-            <figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
-            HTML
-            )
-
-          # Only act if TOC isn't present yet
+          # If TOC missing, try to insert it between Title and Notes,
+          # then fall back to after Title, then at top of Annexes.
           if ! grep -q 'assets/images/annex-toc.png' "$html"; then
-            # Try the ideal placement: between Title and Notes figures
-            perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-title\\.png.*?</figure> )(.*?)( <figure[^>]*>.*?assets/images/annex-notes\\.png.*?</figure> )|\\1\\n${TOC}\\n\\3|s" "$html" || true
-
-            # If still missing, put it immediately AFTER the Title figure
-            if ! grep -q 'assets/images/annex-toc.png' "$html"; then
-              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-title\\.png.*?</figure> )|\\1\\n${TOC}|s" "$html" || true
-            fi
-
-            # If still missing, inject at the start of the Annexes section
-            if ! grep -q 'assets/images/annex-toc.png' "$html"; then
-              perl -0777 -i -pe "s|(<section[^>]*id=\\\"annexes\\\"[^>]*>)|\\1\\n${TOC}\\n|s" "$html" || true
-            fi
+            # Between Title and Notes
+            perl -0777 -i -pe 's|( <figure[^>]*>.*?assets/images/annex-title\.png.*?</figure> )(.*?)( <figure[^>]*>.*?assets/images/annex-notes\.png.*?</figure> )|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n\3|s' "$html" || true
+            # After Title
+            grep -q 'assets/images/annex-toc.png' "$html" || \
+            perl -0777 -i -pe 's|( <figure[^>]*>.*?assets/images/annex-title\.png.*?</figure> )|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|s' "$html" || true
+            # At start of Annexes
+            grep -q 'assets/images/annex-toc.png' "$html" || \
+            perl -0777 -i -pe 's|(<section[^>]*id="annexes"[^>]*>)|\1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n|s' "$html" || true
           fi
 
-          echo "Annex images now (should list title, toc, notes):"
-          grep -n 'assets/images/annex-' "$html" || true
+          echo "Annex images now:"; grep -n 'assets/images/annex-' "$html" || true
 
       - name: Ensure TOC figure exists and sits between Title and Notes
         shell: bash
