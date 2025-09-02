@@ -123,6 +123,40 @@ jobs:
           echo "Annex images referenced (should list title/toc/notes):"
           grep -n 'assets/images/annex-' "$html" || true
 
+      - name: Ensure TOC figure exists and sits between Title and Notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          TOC='<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>'
+
+          # 1) If TOC is missing, insert it in the best spot
+          if ! grep -q 'assets/images/annex-toc.png' "$html"; then
+            if grep -q 'assets/images/annex-notes.png' "$html"; then
+              # Insert TOC immediately BEFORE the Notes figure
+              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-notes\\.png.*?</figure> )|${TOC}\n\\1|s" "$html"
+            elif grep -q 'assets/images/annex-title.png' "$html"; then
+              # Else insert TOC immediately AFTER the Title figure
+              perl -0777 -i -pe "s|( <figure[^>]*>.*?assets/images/annex-title\\.png.*?</figure> )|\\1\n${TOC}|s" "$html"
+            else
+              # Last resort: put TOC at the start of the Annexes section
+              perl -0777 -i -pe "s|(<section[^>]*id=\"annexes\"[^>]*>)|\\1\n${TOC}\n|s" "$html"
+            fi
+          fi
+
+          # 2) If TOC exists but is AFTER Notes, move it before Notes (ensure Title, TOC, Notes order)
+          if grep -q 'assets/images/annex-toc.png' "$html" && grep -q 'assets/images/annex-notes.png' "$html"; then
+            # If the first occurrence of Notes comes before any TOC, move the first TOC to before Notes
+            if awk 'BEGIN{t=0;n=0} /annex-toc.png/{t=NR} /annex-notes.png/{n=NR; exit} END{exit !(n>0 && (t==0 || t>n))}' "$html"; then
+              # Remove the first TOC figure and reinsert before the first Notes figure
+              perl -0777 -i -pe 'my $m; s|( <figure[^>]*>.*?assets/images/annex-toc\.png.*?</figure> )|($m= $1), ""|es' "$html"
+              [ -n "${m-}" ] && perl -0777 -i -pe 's|( <figure[^>]*>.*?assets/images/annex-notes\.png.*?</figure> )|'"$m"'\n$1|s' "$html"
+            fi
+          fi
+
+          echo "Annex images now:"
+          grep -n 'assets/images/annex-' "$html" || true
+
       - name: Final TOC anchoring (insert after its label if still missing)
         shell: bash
         run: |
