@@ -44,9 +44,10 @@ jobs:
       - name: Convert DOCX to PDF
         run: |
           libreoffice --headless \
-            --convert-to "pdf:writer_pdf_Export:EmbedStandardFonts=true;ExportBookmarks=true;SelectPdfVersion=1" \
+            --convert-to "pdf:writer_pdf_Export:EmbedStandardFonts=true;ExportBookmarks=true;SelectPdfVersion=1;IsSkipEmptyPages=true" \
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
+
 
       - name: Install exiftool
         run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
