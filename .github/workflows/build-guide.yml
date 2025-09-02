@@ -18,7 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Tools + Times New Roman for faithful PDF
       - name: Install converters & fonts
         run: |
           sudo apt-get update
@@ -30,7 +29,6 @@ jobs:
           sudo fc-cache -f -v
           fc-list | grep -i "Times New Roman" || true
 
-      # Copy only what we publish (CSS + images)
       - name: Prepare dist and copy assets
         run: |
           set -e
@@ -40,11 +38,9 @@ jobs:
           echo "Published assets:"; ls -la dist/assets || true
           echo "Published images:"; ls -la dist/assets/images || true
 
-      # Build date for footer
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
 
-      # DOCX → PDF (desktop), embed fonts & bookmarks
       - name: Convert DOCX to PDF
         run: |
           libreoffice --headless \
@@ -52,9 +48,9 @@ jobs:
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
 
-      # Set PDF metadata (Title/Author/Subject)
       - name: Install exiftool
         run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
       - name: Set PDF metadata
         env:
           PDF_TITLE: "Guide du programme d'histoire – UQAM"
@@ -62,81 +58,67 @@ jobs:
           PDF_SUBJECT: "Guide du 1er cycle (B.A., majeure, mineures, certificats)"
         run: |
           exiftool -overwrite_original \
-            -Title="$PDF_TITLE" \
-            -Author="$PDF_AUTHOR" \
-            -Subject="$PDF_SUBJECT" \
+            -Title="$PDF_TITLE" -Author="$PDF_AUTHOR" -Subject="$PDF_SUBJECT" \
             -Keywords="UQAM, Histoire, Premier cycle, Guide" \
             dist/Guide_1er_cycle_2025_VF.pdf
           exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
 
-      # DOCX → HTML (mobile) using template + Lua filter
       - name: Convert DOCX to HTML (Pandoc)
         run: |
           pandoc "Guide_1er_cycle_2025_VF.docx" \
-                 -s -t html5 \
-                 --section-divs \
-                 --lua-filter=./assets/section-tagger.lua \
-                 --template=assets/pandoc.html5 \
-                 --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique" \
-                 --metadata lang=fr \
-                 --metadata date="${BUILD_DATE}" \
-                 --toc --toc-depth=3 --number-sections \
-                 --css=assets/uqam-guide.css \
-                 -o dist/index.html
+            -s -t html5 --section-divs \
+            --lua-filter=./assets/section-tagger.lua \
+            --template=assets/pandoc.html5 \
+            --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique" \
+            --metadata lang=fr --metadata date="${BUILD_DATE}" \
+            --toc --toc-depth=3 --number-sections \
+            --css=assets/uqam-guide.css \
+            -o dist/index.html
 
-      # Normalize Annexes: remove any old annex figures, then anchor each image under its section and snip text
-      - name: Normalize Annexes (order + prune text)
+      # Step A: simple wrapper-to-figure replacement (fast path)
+      - name: Swap Annex wrappers for figures (fast path)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          echo "After wrapper swap:"; grep -n 'assets/images/annex-' "$html" || true
+
+      # Step B: if any still missing, anchor by the visible headings and prune text
+      - name: Anchor by headings & prune text (fallback)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
 
-          # 0) Remove ANY previously-inserted annex figures (clean slate)
-          perl -0777 -i -pe 's|<figure\s+class="annex-figure">.*?</figure>||gs' "$html"
-
-          # Helper: replace the BODY of a section (after its <h*> heading) with a single figure.
-          place_by_id() {
-            local idpat="$1" img="$2" alt="$3"
-            # Match a <section> whose id contains the tolerant slug.
-            # Keep the opening tag + heading, replace everything up to </section>.
+          place_after_heading () {
+            pat="$1"; img="$2"; alt="$3"
+            # If image absent, insert right after heading and remove body until next heading or </section>
+            grep -q "$img" "$html" && return 0
             perl -0777 -i -pe "s{
-              (<section[^>]*\\bid=\\\"[^\\\"]*${idpat}[^\\\"]*\\\"[^>]*>\\s*<h[1-6][^>]*>.*?</h[1-6]>)
+              (<(?:h[1-6]|p)[^>]*>.*?${pat}.*?</(?:h[1-6]|p)>)
               (?s).*?
-              (</section>)
-            }{\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n\\2}igx" "$html" || true
+              (?=(?:<h[1-6]|</section>))
+            }{\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n}igx" "$html" || true
           }
 
-          # 1) Place in DOCUMENT order (Title → TOC → Notes)
-          place_by_id "modele[- ]?de[- ]?page[- ]?titre" \
+          # Title → TOC → Notes (this order guarantees the final order)
+          place_after_heading "Mod(?:[èe]le)?\\s+de\\s+page\\s+titre" \
             "assets/images/annex-title.png" "Modèle de page titre (image)"
 
-          place_by_id "modele[- ]?de[- ]?table[- ]?des[- ]?matieres" \
+          place_after_heading "Mod(?:[èe]le)?\\s+de\\s+table\\s+des\\s+mati(?:[èe]res)" \
             "assets/images/annex-toc.png" "Modèle de table des matières (image)"
 
-          place_by_id "exemple[- ]?de[- ]?texte[- ]?avec[- ]?appels[- ]?de[- ]?notes.*citations" \
+          place_after_heading "Exemple\\s+de\\s+texte\\s+avec\\s+appels\\s+de\\s+notes.*citations" \
             "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
 
-          # 2) Last resort: if a figure is still missing (its <img> not found anywhere),
-          #    inject it at the END of the Annexes section in the correct order.
-          inject_at_end_if_missing() {
-            local img="$1" alt="$2"
-            if ! grep -q "$img" "$html"; then
-              perl -0777 -i -pe "s|(</section>\\s*<!--\\s*end of annexes\\s*--> )|\\1|; s|(</section>)|<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n\\1| if (/id=\\\"annexes\\\"/ .. /<\\/section>/)" "$html" || \
-              perl -0777 -i -pe "s|(<section[^>]*id=\\\"annexes\\\"[^>]*>)(?s)(.*?)(</section>)|\\1\\2<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\\n\\3|s" "$html"
-            fi
-          }
-          inject_at_end_if_missing "assets/images/annex-title.png" "Modèle de page titre (image)"
-          inject_at_end_if_missing "assets/images/annex-toc.png"   "Modèle de table des matières (image)"
-          inject_at_end_if_missing "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
+          echo "After heading fallback:"; grep -n 'assets/images/annex-' "$html" || true
 
-          echo "Annex image refs now (expect title, toc, notes exactly once):"
-          grep -n 'assets/images/annex-' "$html" || true
-
-      # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           publish_dir: dist
           publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # cname: guide.histoire.uqam.ca
