@@ -123,6 +123,18 @@ jobs:
           echo "Annex images referenced (should list title/toc/notes):"
           grep -n 'assets/images/annex-' "$html" || true
 
+      - name: Final TOC anchoring (insert after its label if still missing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          # Only act if the TOC image isn't there yet
+          if ! grep -q 'assets/images/annex-toc.png' "$html"; then
+            # Insert the figure immediately after the line "Modèle de table des matières"
+            perl -0777 -i -pe 's{(<(p|h[1-6]|li)[^>]*>\s*Mod(?:[èe]le)?\s+de\s+table\s+des\s+mati(?:[èe]res).*?</\2>)}{$1\n<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>}i' "$html"
+          fi
+          echo "TOC figure present?"; grep -n 'assets/images/annex-toc.png' "$html" || true
+
       # Publish to GitHub Pages (gh-pages branch)
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
