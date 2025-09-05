@@ -1,4 +1,4 @@
-name: Build & publish undergraduate guide (preview)
+name: Build & publish undergraduate guide
 
 on:
   push:
@@ -47,6 +47,7 @@ jobs:
             --convert-to "pdf:writer_pdf_Export:EmbedStandardFonts=true;ExportBookmarks=true;SelectPdfVersion=1;IsSkipEmptyPages=true" \
             "Guide_1er_cycle_2025_VF.docx" \
             --outdir dist
+
 
       - name: Install exiftool
         run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
@@ -116,4 +117,70 @@ jobs:
             pat="$1"; img="$2"; alt="$3"
             # If image absent, insert right after heading and remove body until next heading or </section>
             grep -q "$img" "$html" && return 0
-            perl -
+            perl -0777 -i -pe "s{
+              (<(?:h[1-6]|p)[^>]*>.*?${pat}.*?</(?:h[1-6]|p)>)
+              (?s).*?
+              (?=(?:<h[1-6]|</section>))
+            }{\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n}igx" "$html" || true
+          }
+
+          # Title → TOC → Notes (this order guarantees the final order)
+          place_after_heading "Mod(?:[èe]le)?\\s+de\\s+page\\s+titre" \
+            "assets/images/annex-title.png" "Modèle de page titre (image)"
+
+          place_after_heading "Mod(?:[èe]le)?\\s+de\\s+table\\s+des\\s+mati(?:[èe]res)" \
+            "assets/images/annex-toc.png" "Modèle de table des matières (image)"
+
+          place_after_heading "Exemple\\s+de\\s+texte\\s+avec\\s+appels\\s+de\\s+notes.*citations" \
+            "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
+
+          echo "After heading fallback:"; grep -n 'assets/images/annex-' "$html" || true
+
+# Final, authoritative placement: replace Annexes body with 3 figures in order
+      - name: Replace Annexes content with ordered figures
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          perl -0777 -i -pe '
+            s{
+              (<section[^>]*id="annexes"[^>]*>\s*<h[1-6][^>]*>.*?</h[1-6]>)
+              (?s).*?
+              (</section>)
+            }{
+              $1
+              \n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
+              \n<figure class="annex-figure"><img src="assets/images/annex-toc.png"   alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
+              \n<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
+              \n$2
+            }isx;
+          ' "$html"
+          echo "Annex images now referenced (expect title, toc, notes):"
+          grep -n 'assets/images/annex-' "$html" || true
+
+      - name: Remove stray Annex III footnotes (4 & 5)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # 1) Remove by id if numbers are stable
+          perl -0777 -i -pe 's#\s*<li id="fn4">.*?</li>\s*##gs' "$html" || true
+          perl -0777 -i -pe 's#\s*<li id="fn5">.*?</li>\s*##gs' "$html" || true
+
+          # 2) Also remove by content (in case numbering shifts later)
+          perl -0777 -i -pe 's#\s*<li id="fn\d+">(?:(?:(?!</li>).)*?(Louis\s+Buade\s+de\s+Frontenac|Jean[-\s]?Baptiste\s+Colbert).+?)</li>\s*##gs' "$html" || true
+
+          # 3) Sanity check
+          echo "Remaining footnotes:"
+          grep -n '<li id="fn' "$html" || true
+
+
+      - name: Deploy PREVIEW to GitHub Pages (under /preview)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_dir: dist
+          publish_branch: gh-pages
+          destination_dir: preview
+          keep_files: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
