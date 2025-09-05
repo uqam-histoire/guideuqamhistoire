@@ -7,10 +7,14 @@
 cycle en histoire et en archivistique</title>
   <link rel="stylesheet" href="assets/uqam-guide.css?v=2025-09-05">
 <style>
-  details.toc ul{ list-style:none; padding-left:.5rem; }
+  details.toc{ margin:.75rem 0 1.25rem; border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#fafbfc; }
+  details.toc summary{ cursor:pointer; font-weight:600; color:var(--uqam-blue); }
+  details.toc ul{ list-style:none; padding-left:.5rem; margin:0; }
   details.toc li{ margin:.15rem 0; }
   details.toc li li{ padding-left:1rem; }
-  details.toc a{ display:block; padding:.2rem .3rem; border-radius:.25rem; text-decoration:none; color:inherit; }
+  details.toc li li li{ padding-left:1.6rem; }
+  details.toc li li li li{ padding-left:2.2rem; }
+  details.toc a{ display:block; padding:.2rem .3rem; border-radius:.25rem; text-decoration:none; color:var(--uqam-blue); }
   details.toc a:hover{ background:#f6f8fa; text-decoration:underline; }
   </style></head>
 <body id="top">
@@ -23,7 +27,7 @@ cycle en histoire et en archivistique</title>
 </header>
 
 <details class="toc" id="toc">
-  <summary>Sommaire</summary>
+  <summary>Table de Matières</summary>
   <ul>
   <li><a href="#programmes-ressources-et-règlements"
   id="toc-programmes-ressources-et-règlements"><span
@@ -66,17 +70,103 @@ cycle en histoire et en archivistique</title>
   </a></li>
   <li><a href="#typographie-et-mise-en-forme"
   id="toc-typographie-et-mise-en-forme"><span
-  class="toc-section-number">2.3</span> Typographie et mise en
-  forme</a></li>
+  class="toc-section-number">2.3</span> Typographie et mise en forme</a>
+  <ul>
+  <li><a href="#quelques-règles-typographiques-dusage"
+  id="toc-quelques-règles-typographiques-dusage"><span
+  class="toc-section-number">2.3.0.1</span> Quelques règles
+  typographiques d’usage</a></li>
+  <li><a href="#page-titre" id="toc-page-titre"><span
+  class="toc-section-number">2.3.0.2</span> Page titre</a></li>
+  <li><a href="#pagination-et-table-des-matières"
+  id="toc-pagination-et-table-des-matières"><span
+  class="toc-section-number">2.3.0.3</span> Pagination et table des
+  matières </a></li>
+  <li><a href="#figures" id="toc-figures"><span
+  class="toc-section-number">2.3.0.4</span> Figures</a></li>
+  </ul></li>
   <li><a href="#références-bibliographiques"
   id="toc-références-bibliographiques"><span
   class="toc-section-number">2.4</span> Références bibliographiques</a>
   <ul>
   <li><a href="#notes-de-bas-de-page"
   id="toc-notes-de-bas-de-page"><span
-  class="toc-section-number">2.4.1</span> Notes de bas de page</a></li>
+  class="toc-section-number">2.4.1</span> Notes de bas de page</a>
+  <ul>
+  <li><a href="#appel-de-note" id="toc-appel-de-note"><span
+  class="toc-section-number">2.4.1.1</span> Appel de note</a></li>
+  <li><a href="#éléments-constitutifs-dune-référence-en-note"
+  id="toc-éléments-constitutifs-dune-référence-en-note"><span
+  class="toc-section-number">2.4.1.2</span> Éléments constitutifs d’une
+  référence en note</a></li>
+  <li><a href="#répétition-dune-référence"
+  id="toc-répétition-dune-référence"><span
+  class="toc-section-number">2.4.1.3</span> Répétition d’une
+  référence</a></li>
+  <li><a href="#référence-empruntée" id="toc-référence-empruntée"><span
+  class="toc-section-number">2.4.1.4</span> Référence empruntée</a></li>
+  <li><a href="#plusieurs-références-dans-une-même-note"
+  id="toc-plusieurs-références-dans-une-même-note"><span
+  class="toc-section-number">2.4.1.5</span> Plusieurs références dans
+  une même note</a></li>
+  </ul></li>
   <li><a href="#bibliographie" id="toc-bibliographie"><span
-  class="toc-section-number">2.4.2</span> Bibliographie</a></li>
+  class="toc-section-number">2.4.2</span> Bibliographie</a>
+  <ul>
+  <li><a href="#classement" id="toc-classement"><span
+  class="toc-section-number">2.4.2.1</span> Classement</a></li>
+  <li><a href="#éléments-récurrents" id="toc-éléments-récurrents"><span
+  class="toc-section-number">2.4.2.2</span> Éléments récurrents</a></li>
+  <li><a href="#ressources-numériques"
+  id="toc-ressources-numériques"><span
+  class="toc-section-number">2.4.2.3</span> Ressources
+  numériques</a></li>
+  <li><a href="#livres" id="toc-livres"><span
+  class="toc-section-number">2.4.2.4</span> Livres</a></li>
+  <li><a href="#chapitres-douvrages-collectifs"
+  id="toc-chapitres-douvrages-collectifs"><span
+  class="toc-section-number">2.4.2.5</span> Chapitres d’ouvrages
+  collectifs </a></li>
+  <li><a href="#thèses-et-mémoires" id="toc-thèses-et-mémoires"><span
+  class="toc-section-number">2.4.2.6</span> Thèses et mémoires</a></li>
+  <li><a href="#articles-scientifiques"
+  id="toc-articles-scientifiques"><span
+  class="toc-section-number">2.4.2.7</span> Articles scientifiques
+  </a></li>
+  <li><a href="#comptes-rendus" id="toc-comptes-rendus"><span
+  class="toc-section-number">2.4.2.8</span> Comptes rendus</a></li>
+  <li><a
+  href="#autres-types-de-périodiques-articles-de-journaux-comptes-rendus-de-débats-parlementaires"
+  id="toc-autres-types-de-périodiques-articles-de-journaux-comptes-rendus-de-débats-parlementaires"><span
+  class="toc-section-number">2.4.2.9</span> Autres types de périodiques
+  (articles de journaux, comptes rendus de débats
+  parlementaires) </a></li>
+  <li><a href="#articles-dencyclopédies-billets-de-blogues"
+  id="toc-articles-dencyclopédies-billets-de-blogues"><span
+  class="toc-section-number">2.4.2.10</span> Articles d’encyclopédies,
+  billets de blogues</a></li>
+  <li><a href="#expositions-virtuelles-ou-sites-web-multimédia"
+  id="toc-expositions-virtuelles-ou-sites-web-multimédia"><span
+  class="toc-section-number">2.4.2.11</span> Expositions virtuelles ou
+  sites web multimédia </a></li>
+  <li><a href="#bases-de-données-mises-à-jour-en-continu"
+  id="toc-bases-de-données-mises-à-jour-en-continu"><span
+  class="toc-section-number">2.4.2.12</span> Bases de données mises à
+  jour en continu </a></li>
+  <li><a
+  href="#ressources-audiovisuelles-documentaires-balados-émissions-de-radio-etc."
+  id="toc-ressources-audiovisuelles-documentaires-balados-émissions-de-radio-etc."><span
+  class="toc-section-number">2.4.2.13</span> Ressources audiovisuelles
+  (documentaires, balados, émissions de radio, etc.)</a></li>
+  <li><a href="#cartes-géographiques"
+  id="toc-cartes-géographiques"><span
+  class="toc-section-number">2.4.2.14</span> Cartes
+  géographiques</a></li>
+  <li><a href="#documents-darchives-manuscrits"
+  id="toc-documents-darchives-manuscrits"><span
+  class="toc-section-number">2.4.2.15</span> Documents d’archives
+  manuscrits</a></li>
+  </ul></li>
   </ul></li>
   <li><a href="#citations" id="toc-citations"><span
   class="toc-section-number">2.5</span> Citations</a></li>
