@@ -101,17 +101,12 @@ jobs:
           set -euo pipefail
           html="dist/index.html"
 
-          # Normalize non-breaking spaces so matches are consistent
+          # Normalize non-breaking spaces for reliable matching
           perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
 
-          # Preferred: remove from "Table de matières" (in <p> or <hN>) up to the intro blockquote
-          perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati[^<]*</(?:p|h[1-6])>\s*(?s:.*?)(?=<blockquote\b)@@ig' "$html"
-
-          # Fallback: if still present, remove up to the first H1 (older files with no intro blockquote)
-          if grep -qi "Table de mati" "$html"; then
-            perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati[^<]*</(?:p|h[1-6])>\s*(?s:.*?)(?=<h1\b)@@ig' "$html"
-          fi
-
+          # Remove the consecutive numbered <p> entries that appear right BEFORE the intro blockquote
+          # (i.e., the Word ToC lines like "1 …", "1.2 …", "2.3.1 …")
+          perl -0777 -i -pe 's@\s*(?:<p\b[^>]*>\s*(?:<[^>]+>\s*)*\d[\s\S]*?</p>\s*)+(?=\s*<blockquote\b)@@ig' "$html"
 
       - name: Inject preview-only TOC styles (Sommaire)
         shell: bash
