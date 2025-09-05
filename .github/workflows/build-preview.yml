@@ -95,6 +95,18 @@ jobs:
             --css=assets/uqam-guide.css \
             -o dist/index.html
 
+      - name: Inject preview-only TOC styles (Sommaire)
+        shell: bash
+        run: |
+          html="dist/index.html"
+          perl -0777 -i -pe 's#</head>#<style>
+            details.toc ul{ list-style:none; padding-left:.5rem; }
+            details.toc li{ margin:.15rem 0; }
+            details.toc li li{ padding-left:1rem; }
+            details.toc a{ display:block; padding:.2rem .3rem; border-radius:.25rem; text-decoration:none; color:inherit; }
+            details.toc a:hover{ background:#f6f8fa; text-decoration:underline; }
+            </style></head>#i' "$html"
+
       # Step A: simple wrapper-to-figure replacement (fast path)
       - name: Swap Annex wrappers for figures (fast path)
         shell: bash
