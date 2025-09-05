@@ -101,24 +101,17 @@ jobs:
           set -euo pipefail
           html="dist/index.html"
 
-          # Normalize non-breaking spaces so digit tests work
+          # Normalize non-breaking spaces so matches are consistent
           perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
 
-          # Remove the ToC heading line itself (P or H tag)
-          perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati.*?</(?:p|h[1-6])>\s*@@ig' "$html"
+          # Preferred: remove from "Table de matières" (in <p> or <hN>) up to the intro blockquote
+          perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati[^<]*</(?:p|h[1-6])>\s*(?s:.*?)(?=<blockquote\b)@@ig' "$html"
 
-          # Remove ONLY the block of consecutive ToC entries that immediately follow:
-          # those entries are paragraphs starting with a number like "1", "1.2", "2.3.1.4", etc.
-          perl -0777 -i -pe '
-            s@
-              \G                                              # start right after previous match (the heading we just removed)
-              (?:
-                \s*<p\b[^>]*>\s*(?:<[^>]+>\s*)*               # a paragraph (allow inline wrappers)
-                (?=\d)                                        # that begins with a digit
-                [\s\S]*?</p>                                  # …until its end
-              )+                                              # one or more such numbered paragraphs
-            @@igx
-          ' "$html"
+          # Fallback: if still present, remove up to the first H1 (older files with no intro blockquote)
+          if grep -qi "Table de mati" "$html"; then
+            perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati[^<]*</(?:p|h[1-6])>\s*(?s:.*?)(?=<h1\b)@@ig' "$html"
+          fi
+
 
       - name: Inject preview-only TOC styles (Sommaire)
         shell: bash
