@@ -100,16 +100,24 @@ jobs:
         run: |
           set -euo pipefail
           html="dist/index.html"
-          # Remove the block that starts at a heading OR paragraph containing "Table de matières"
+
+          # 0) Normalise non-breaking spaces so regex sees real spaces
+          perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
+
+          # 1) Remove from the "Table de matières" label (in a <p> or <hN>, with possible inline tags)
+          #    up to (but not including) the next <h1 ...> (start of real content)
           perl -0777 -i -pe '
             s{
-              (<(?:h[1-6]|p)\b[^>]*>\s*Table\s+de\s+mati(?:[èe]res)\s*</(?:h[1-6]|p)>\s*)
-              (?s).*?
-              (?=(?:<h[1-6]\b|</section>))
+              (?:<p[^>]*>\s*|<h[1-6][^>]*>\s*)        # opening P or H
+              (?:<[^>]+>\s*)*                         # optional inline wrappers
+              Table\s+de\s+mati(?:&egrave;|&#232;|[eè])res # "Table de matières" with accents/entities
+              (?:.*?</(?:p|h[1-6])>\s*)?              # close the title line
+              (?s:.*?)                                # everything that follows...
+              (?=<h1\b)                               # ...until the first H1
             }{}igx;
           ' "$html"
 
-         # Sanity check: warn if the body ToC title still exists
+          # 2) Sanity check (warn if still present)
           if grep -qi "Table de mati" "$html"; then
             echo "::warning::Body 'Table de matières' still present after removal step."
           else
