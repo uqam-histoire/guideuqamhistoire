@@ -91,7 +91,7 @@ jobs:
             --template=assets/pandoc.html5 \
             --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique" \
             --metadata lang=fr --metadata date="${BUILD_DATE}" \
-            --toc --toc-depth=3 --number-sections \
+            --toc --toc-depth=4 --number-sections \
             --css=assets/uqam-guide.css \
             -o dist/index.html
 
@@ -108,15 +108,29 @@ jobs:
           # (i.e., the Word ToC lines like "1 …", "1.2 …", "2.3.1 …")
           perl -0777 -i -pe 's@\s*(?:<p\b[^>]*>\s*(?:<[^>]+>\s*)*\d[\s\S]*?</p>\s*)+(?=\s*<blockquote\b)@@ig' "$html"
 
-      - name: Inject preview-only TOC styles (Sommaire)
+      - name: Rename Sommaire to “Table de Matières”
         shell: bash
         run: |
+          set -euo pipefail
           html="dist/index.html"
+          # Replace whatever is between <summary>…</summary> in the details.toc block
+          perl -0777 -i -pe 's@(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>\s*<summary[^>]*>)(.*?)(</summary>)@$1Table de Matières$3@is' "$html"
+
+      - name: Inject preview-only ToC styles (links + indent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          # Inline CSS (safe & cache-proof for preview)
           perl -0777 -i -pe 's@</head>@<style>
-            details.toc ul{ list-style:none; padding-left:.5rem; }
+            details.toc{ margin:.75rem 0 1.25rem; border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#fafbfc; }
+            details.toc summary{ cursor:pointer; font-weight:600; color:var(--uqam-blue); }
+            details.toc ul{ list-style:none; padding-left:.5rem; margin:0; }
             details.toc li{ margin:.15rem 0; }
             details.toc li li{ padding-left:1rem; }
-            details.toc a{ display:block; padding:.2rem .3rem; border-radius:.25rem; text-decoration:none; color:inherit; }
+            details.toc li li li{ padding-left:1.6rem; }
+            details.toc li li li li{ padding-left:2.2rem; }
+            details.toc a{ display:block; padding:.2rem .3rem; border-radius:.25rem; text-decoration:none; color:var(--uqam-blue); }
             details.toc a:hover{ background:#f6f8fa; text-decoration:underline; }
             </style></head>@i' "$html"
 
