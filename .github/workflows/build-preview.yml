@@ -1,0 +1,119 @@
+name: Build & publish undergraduate guide (preview)
+
+on:
+  push:
+    branches: [ staging ]
+    paths:
+      - "Guide_1er_cycle_2025_VF.docx"
+      - "assets/**"
+      - ".github/workflows/build-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install converters & fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice pandoc fontconfig software-properties-common
+          sudo add-apt-repository multiverse -y
+          sudo apt-get update
+          echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
+          sudo apt-get install -y ttf-mscorefonts-installer
+          sudo fc-cache -f -v
+          fc-list | grep -i "Times New Roman" || true
+
+      - name: Prepare dist and copy assets
+        run: |
+          set -e
+          mkdir -p dist/assets/images
+          cp assets/*.css dist/assets/ 2>/dev/null || true
+          cp assets/images/* dist/assets/images/ 2>/dev/null || true
+          echo "Published assets:"; ls -la dist/assets || true
+          echo "Published images:"; ls -la dist/assets/images || true
+
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
+
+      - name: Convert DOCX to PDF
+        run: |
+          libreoffice --headless \
+            --convert-to "pdf:writer_pdf_Export:EmbedStandardFonts=true;ExportBookmarks=true;SelectPdfVersion=1;IsSkipEmptyPages=true" \
+            "Guide_1er_cycle_2025_VF.docx" \
+            --outdir dist
+
+      - name: Install exiftool
+        run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
+      - name: Install qpdf & poppler-utils
+        run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
+
+      - name: Set PDF metadata
+        env:
+          PDF_TITLE: "Guide du programme d'histoire – UQAM"
+          PDF_AUTHOR: "Département d’histoire, UQAM"
+          PDF_SUBJECT: "Guide du 1er cycle (B.A., majeure, mineures, certificats)"
+        run: |
+          exiftool -overwrite_original \
+            -Title="$PDF_TITLE" -Author="$PDF_AUTHOR" -Subject="$PDF_SUBJECT" \
+            -Keywords="UQAM, Histoire, Premier cycle, Guide" \
+            dist/Guide_1er_cycle_2025_VF.pdf
+          exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
+
+      - name: Drop blank page 3 if empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          pdf="dist/Guide_1er_cycle_2025_VF.pdf"
+
+          # Extract text from page 3; if there's none (only whitespace), drop page 3.
+          if [ "$(pdftotext -f 3 -l 3 "$pdf" - | tr -d '\f\r\n[:space:]' | wc -c)" -eq 0 ]; then
+            # Reassemble without page 3: 1-2,4..end
+            qpdf --empty --pages "$pdf" 1-2,4-z -- "${pdf%.pdf}.tmp.pdf"
+            mv -f "${pdf%.pdf}.tmp.pdf" "$pdf"
+            echo "Removed blank page 3."
+          else
+            echo "Page 3 not empty; leaving PDF unchanged."
+          fi
+
+      - name: Convert DOCX to HTML (Pandoc)
+        run: |
+          pandoc "Guide_1er_cycle_2025_VF.docx" \
+            -s -t html5 --section-divs \
+            --lua-filter=./assets/section-tagger.lua \
+            --template=assets/pandoc.html5 \
+            --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique" \
+            --metadata lang=fr --metadata date="${BUILD_DATE}" \
+            --toc --toc-depth=3 --number-sections \
+            --css=assets/uqam-guide.css \
+            -o dist/index.html
+
+      # Step A: simple wrapper-to-figure replacement (fast path)
+      - name: Swap Annex wrappers for figures (fast path)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          echo "After wrapper swap:"; grep -n 'assets/images/annex-' "$html" || true
+
+      # Step B: if any still missing, anchor by the visible headings and prune text
+      - name: Anchor by headings & prune text (fallback)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          place_after_heading () {
+            pat="$1"; img="$2"; alt="$3"
+            # If image absent, insert right after heading and remove body until next heading or </section>
+            grep -q "$img" "$html" && return 0
+            perl -
