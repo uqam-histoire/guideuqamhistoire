@@ -101,25 +101,17 @@ jobs:
           set -euo pipefail
           html="dist/index.html"
 
-          # 0) Normalise non-breaking spaces so regex sees real spaces
+          # Normalize non-breaking spaces so the regex sees real spaces
           perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
 
-          # 1) Remove from the "Table de matières" label (in a <p> or <hN>, with possible inline tags)
-          #    up to (but not including) the next <h1 ...> (start of real content)
-          perl -0777 -i -pe '
-            s{
-              (?:<p[^>]*>\s*|<h[1-6][^>]*>\s*)        # opening P or H
-              (?:<[^>]+>\s*)*                         # optional inline wrappers
-              Table\s+de\s+mati(?:&egrave;|&#232;|[eè])res # "Table de matières" with accents/entities
-              (?:.*?</(?:p|h[1-6])>\s*)?              # close the title line
-              (?s:.*?)                                # everything that follows...
-              (?=<h1\b)                               # ...until the first H1
-            }{}igx;
-          ' "$html"
+          # Remove from the "Table de matières" line (in a <p> or <hN>, with any inline tags)
+          # up to (but not including) the next <h1 ...> (start of main content)
+          perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati.*?</(?:p|h[1-6])>\s*(?s:.*?)(?=<h1\b)@@ig' "$html"
 
-          # 2) Sanity check (warn if still present)
+          # Sanity check
           if grep -qi "Table de mati" "$html"; then
-            echo "::warning::Body 'Table de matières' still present after removal step."
+            echo "::warning::Body 'Table de matières' likely still present after removal step."
+            grep -n "Table de mati" "$html" || true
           else
             echo "Body 'Table de matières' removed."
           fi
