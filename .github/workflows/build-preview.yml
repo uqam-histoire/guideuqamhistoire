@@ -101,20 +101,24 @@ jobs:
           set -euo pipefail
           html="dist/index.html"
 
-          # Normalize non-breaking spaces so the regex sees real spaces
+          # Normalize non-breaking spaces so digit tests work
           perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
 
-          # Remove from the "Table de matières" line (in a <p> or <hN>, with any inline tags)
-          # up to (but not including) the next <h1 ...> (start of main content)
-          perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati.*?</(?:p|h[1-6])>\s*(?s:.*?)(?=<h1\b)@@ig' "$html"
+          # Remove the ToC heading line itself (P or H tag)
+          perl -0777 -i -pe 's@<(?:p|h[1-6])\b[^>]*>.*?Table\s+de\s+mati.*?</(?:p|h[1-6])>\s*@@ig' "$html"
 
-          # Sanity check
-          if grep -qi "Table de mati" "$html"; then
-            echo "::warning::Body 'Table de matières' likely still present after removal step."
-            grep -n "Table de mati" "$html" || true
-          else
-            echo "Body 'Table de matières' removed."
-          fi
+          # Remove ONLY the block of consecutive ToC entries that immediately follow:
+          # those entries are paragraphs starting with a number like "1", "1.2", "2.3.1.4", etc.
+          perl -0777 -i -pe '
+            s@
+              \G                                              # start right after previous match (the heading we just removed)
+              (?:
+                \s*<p\b[^>]*>\s*(?:<[^>]+>\s*)*               # a paragraph (allow inline wrappers)
+                (?=\d)                                        # that begins with a digit
+                [\s\S]*?</p>                                  # …until its end
+              )+                                              # one or more such numbered paragraphs
+            @@igx
+          ' "$html"
 
       - name: Inject preview-only TOC styles (Sommaire)
         shell: bash
