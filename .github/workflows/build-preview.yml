@@ -95,6 +95,27 @@ jobs:
             --css=assets/uqam-guide.css \
             -o dist/index.html
 
+      - name: Hide Word-generated Table des matières (body)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          # Remove the block that starts at a heading OR paragraph containing "Table de matières"
+          perl -0777 -i -pe '
+            s{
+              (<(?:h[1-6]|p)\b[^>]*>\s*Table\s+de\s+mati(?:[èe]res)\s*</(?:h[1-6]|p)>\s*)
+              (?s).*?
+              (?=(?:<h[1-6]\b|</section>))
+            }{}igx;
+          ' "$html"
+
+         # Sanity check: warn if the body ToC title still exists
+          if grep -qi "Table de mati" "$html"; then
+            echo "::warning::Body 'Table de matières' still present after removal step."
+          else
+            echo "Body 'Table de matières' removed."
+          fi
+
       - name: Inject preview-only TOC styles (Sommaire)
         shell: bash
         run: |
