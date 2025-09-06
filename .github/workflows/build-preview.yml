@@ -95,18 +95,20 @@ jobs:
             --css=assets/uqam-guide.css \
             -o dist/index.html
 
-      - name: Hide Word-generated Table des matières (body)
+      - name: Hide Word-generated Table des matières (front matter only)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
-
-          # Normalize non-breaking spaces for reliable matching
-          perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
-
-          # Remove the consecutive numbered <p> entries that appear right BEFORE the intro blockquote
-          # (i.e., the Word ToC lines like "1 …", "1.2 …", "2.3.1 …")
-          perl -0777 -i -pe 's@\s*(?:<p\b[^>]*>\s*(?:<[^>]+>\s*)*\d[\s\S]*?</p>\s*)+(?=\s*<blockquote\b)@@ig' "$html"
+          # Work only on the part before the first H1
+          perl -0777 -i -pe '
+            s{\A(.*?)(?=<h1\b)}{
+              my $lead = $1;
+              # Remove the numbered-paragraph ToC that comes right before the intro blockquote
+              $lead =~ s@\s*(?:<p[^>]*>\s*(?:\d+(?:\.\d+)*)[^<]*</p>\s*)+(?=\s*<blockquote\b)@@isg;
+              $lead
+            }eis
+          ' "$html"
 
       - name: Rename Sommaire to “Table de Matières”
         shell: bash
@@ -145,27 +147,28 @@ jobs:
           perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
           echo "After wrapper swap:"; grep -n 'assets/images/annex-' "$html" || true
 
-# Final, authoritative placement: replace Annexes body with 3 figures in order
-      - name: Replace Annexes content with ordered figures
+      # Final, authoritative placement: replace Annexes body with 3 figures in order
+      - name: Replace Annexes content with ordered figures (by heading text)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
           perl -0777 -i -pe '
             s{
-              (<section[^>]*id="annexes"[^>]*>\s*<h[1-6][^>]*>.*?</h[1-6]>)
-              (?s).*?
-              (</section>)
+              (                               # $1 = <section> + heading
+                <section[^>]*> \s*
+                <h[1-6][^>]*> \s* (?:\d+\s+)? Annexes \b .*? </h[1-6]>
+              )
+              (?s).*?                         # everything until…
+              (</section>)                    # $2 = closing section
             }{
               $1
               \n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
               \n<figure class="annex-figure"><img src="assets/images/annex-toc.png"   alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
               \n<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
               \n$2
-            }isx;
+            }igx;
           ' "$html"
-          echo "Annex images now referenced (expect title, toc, notes):"
-          grep -n 'assets/images/annex-' "$html" || true
 
       - name: Remove stray Annex III footnotes (4 & 5)
         shell: bash
