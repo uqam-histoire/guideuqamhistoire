@@ -100,14 +100,11 @@ jobs:
         run: |
           set -euo pipefail
           html="dist/index.html"
-
-          # Work only on content BEFORE the first H1 (front matter)
           perl -0777 -i -pe '
             s{\A(.*?)(?=<h1\b)}{
               my $lead = $1;
-              # Normalize &nbsp;
-              $lead =~ s/&nbsp;/ /g;
-              # Remove ANY run of 5+ consecutive numbered ToC paragraphs (e.g., "1 …", "1.2 …")
+              $lead =~ s/&nbsp;/ /g;  # normalize NBSP
+              # remove any block of 5+ consecutive numbered <p> (1, 1.2, 2.3.1, …)
               $lead =~ s{(?:\s*<p\b[^>]*>\s*(?:<[^>]+>\s*)*\d+(?:\.\d+)*[\s\S]*?</p>){5,}}{}isg;
               $lead
             }eis
@@ -156,25 +153,31 @@ jobs:
         run: |
           set -euo pipefail
           html="dist/index.html"
-          # Normalize &nbsp; to avoid matching glitches
           perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
 
           perl -0777 -i -pe '
-            s{
-              (                                   # $1 = <section> + heading "Annexes"
-                <section[^>]*>\s*
-                <h[1-6][^>]*>\s*(?:\d+\s+)?Annexes\b.*?</h[1-6]>
-              )
-              (?s).*?                             # section body
-              (</section>)                        # $2 = closing
-            }{
-              $1
-              \n<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
-              \n<figure class="annex-figure"><img src="assets/images/annex-toc.png"   alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
-              \n<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
-              \n$2
-            }igx;
+            my $figs = qq{
+            <figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
+            <figure class="annex-figure"><img src="assets/images/annex-toc.png"   alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
+            <figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>};
+
+            # Try: section with id containing "annex"
+            if (!s{
+                  ( <section[^>]*\bid="[^"]*annex[^"]*"[^>]*> \s*
+                    <h[1-6][^>]*> [\s\S]*? Annexes [\s\S]*? </h[1-6]> )
+                  [\s\S]*?
+                  ( </section> )
+                }{$1\n$figs\n$2}igx)
+            {
+              # Fallback: match by heading text only
+              s{
+                ( <section[^>]*> \s* <h[1-6][^>]*> [\s\S]*? Annexes [\s\S]*? </h[1-6]> )
+                [\s\S]*?
+                ( </section> )
+              }{$1\n$figs\n$2}igx;
+            }
           ' "$html"
+
 
 
       - name: Remove stray Annex III footnotes (4 & 5)
@@ -200,26 +203,26 @@ jobs:
           set -euo pipefail
           html="dist/index.html"
 
-          # ToC should be gone from front matter
-          if grep -n -i 'Table de mati' "$html" | head -1 | grep -q '^[0-9]\+:'; then
-            echo "::warning::'Table de matières' still present somewhere—check manually."
+          # Fail if a Word-style ToC (≥5 numbered paragraphs) still exists BEFORE the first H1
+          if perl -0777 -ne '
+               if (m/\A(.*?)(?=<h1\b)/is) {
+                 my $lead=$1; $lead =~ s/&nbsp;/ /g;
+                 if ($lead =~ /(?:\s*<p\b[^>]*>\s*(?:<[^>]+>\s*)*\d+(?:\.\d+)*[\s\S]*?<\/p>){5,}/i) { exit 9 }
+               }
+             ' "$html"; then :; else
+             code=$?; if [ "$code" -eq 9 ]; then
+               echo "::error::Front-matter ToC still present (numbered block)"; exit 1;
+             fi
           fi
 
-          # HTML must reference all three Annex images exactly once
+          # Each Annex mock image should appear exactly once in the HTML and exist on disk
           for img in annex-title.png annex-toc.png annex-notes.png; do
             refs=$(grep -c "assets/images/$img" "$html" || true)
             if [ "$refs" -ne 1 ]; then
-              echo "::error::Expected 1 reference to $img, found $refs"
-              exit 1
+              echo "::error::Expected 1 reference to $img, found $refs"; exit 1;
             fi
-          done
-
-          # Files must exist
-          for img in annex-title.png annex-toc.png annex-notes.png; do
             test -f "dist/assets/images/$img" || { echo "::error::dist/assets/images/$img missing"; exit 1; }
           done
-
-
 
       - name: Deploy PREVIEW to GitHub Pages (under /preview)
         uses: peaceiris/actions-gh-pages@v4
