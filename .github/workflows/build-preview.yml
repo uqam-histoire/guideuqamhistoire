@@ -110,6 +110,20 @@ jobs:
             }eis
           ' "$html"
 
+      - name: Remove stray "Table des matières" heading (front matter only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          # Remove a single P/H heading that says "Table de(s) matières" BEFORE the first H1
+          perl -0777 -i -pe '
+            s{\A(.*?)(?=<h1\b)}{
+              my $lead = $1; $lead =~ s/&nbsp;/ /g;
+              $lead =~ s@<(?:p|h[1-6])\b[^>]*>\s*(?:<[^>]+>\s*)*Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res(?:\s*[:\.])?\s*</(?:p|h[1-6])>\s*@@ig;
+              $lead
+            }eis
+          ' "$html"
+
       - name: Rename Sommaire to “Table de Matières”
         shell: bash
         run: |
