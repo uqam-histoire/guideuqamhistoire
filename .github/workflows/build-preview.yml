@@ -110,27 +110,42 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove stray "Table des matières" heading (front matter only)
+      - name: Remove stray "Table des matières" label (front matter; keep collapsible ToC)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
-          # Remove a single P/H heading that says "Table de(s) matières" BEFORE the first H1
           perl -0777 -i -pe '
             s{\A(.*?)(?=<h1\b)}{
               my $lead = $1; $lead =~ s/&nbsp;/ /g;
+
+              # 1) Carve out the collapsible ToC so we don’t touch its <summary>
+              my $toc = "";
+              if ($lead =~ s{(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>.*?</details>)}{}is) {
+                $toc = $1;
+              }
+
+              # 2) Drop a standalone heading/paragraph that says "Table de(s) matières"
               $lead =~ s@<(?:p|h[1-6])\b[^>]*>\s*(?:<[^>]+>\s*)*Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res(?:\s*[:\.])?\s*</(?:p|h[1-6])>\s*@@ig;
-              $lead
+
+              # 3) Or, if it’s just bare text before the intro blockquote, remove the phrase
+              $lead =~ s@Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res(?:\s*[:\.])?\s*(?=\s*<blockquote\b)@@ig;
+
+              # 4) Clean up any now-empty <p> tags
+              $lead =~ s@<p[^>]*>\s*</p>@@ig;
+
+              # Reassemble: keep the collapsible ToC first, then the cleaned front matter
+              $toc . $lead
             }eis
           ' "$html"
 
-      - name: Rename Sommaire to “Table de Matières”
+      - name: Rename Sommaire to “Table des Matières”
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
           # Replace whatever is between <summary>…</summary> in the details.toc block
-          perl -0777 -i -pe 's@(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>\s*<summary[^>]*>)(.*?)(</summary>)@$1Table de Matières$3@is' "$html"
+          perl -0777 -i -pe 's@(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>\s*<summary[^>]*>)(.*?)(</summary>)@$1Table des Matières$3@is' "$html"
 
       - name: Inject preview-only ToC styles (links + indent)
         shell: bash
