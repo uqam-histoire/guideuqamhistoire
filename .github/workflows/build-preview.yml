@@ -115,24 +115,20 @@ jobs:
         run: |
           set -euo pipefail
           html="dist/index.html"
-          # Work only on the part BEFORE the first H1 (front matter)
           perl -0777 -i -pe '
-           s{\A(.*?)(?=<h1\b)}{
+            s{\A(.*?)(?=<h1\b)}{
               my $lead = $1;
 
-              # Matches "Table de(s) matières" with spaces or NBSPs and with è as unicode or HTML entity
-              my $tm = qr/
-                Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+
-                mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res
-              /ix;
+              # Phrase matcher: "Table de(s) matières" with normal/NBSP spaces and è variants
+              my $tm = qr/Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res/i;
 
-              # (A) If the phrase is inside a paragraph (allow inline tags inside the <p>)
+              # (A) Drop a paragraph that contains that phrase (allow inline tags inside <p>…</p>)
               $lead =~ s@<p\b[^>]*>(?:(?!</p>).)*?$tm(?:(?!</p>).)*?</p>\s*@@ig;
 
-              # (B) If the phrase appears as bare text just before the intro blockquote
+              # (B) If it’s bare text just before the intro blockquote, remove the phrase there too
               $lead =~ s@$tm\s*(?=\s*<blockquote\b)@@ig;
 
-              # Cleanup: drop empty paragraphs created by the removal
+              # Cleanup: remove any now-empty <p>…</p>
               $lead =~ s@<p[^>]*>\s*</p>@@ig;
 
               $lead
