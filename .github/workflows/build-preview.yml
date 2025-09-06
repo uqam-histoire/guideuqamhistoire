@@ -110,7 +110,7 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove stray "Table des matières" label (front matter; keep collapsible ToC)
+      - name: Remove stray Table des matières paragraph (front matter)
         shell: bash
         run: |
           set -euo pipefail
@@ -118,24 +118,13 @@ jobs:
           perl -0777 -i -pe '
             s{\A(.*?)(?=<h1\b)}{
               my $lead = $1; $lead =~ s/&nbsp;/ /g;
-
-              # 1) Carve out the collapsible ToC so we don’t touch its <summary>
-              my $toc = "";
-              if ($lead =~ s{(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>.*?</details>)}{}is) {
-                $toc = $1;
-              }
-
-              # 2) Drop a standalone heading/paragraph that says "Table de(s) matières"
-              $lead =~ s@<(?:p|h[1-6])\b[^>]*>\s*(?:<[^>]+>\s*)*Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res(?:\s*[:\.])?\s*</(?:p|h[1-6])>\s*@@ig;
-
-              # 3) Or, if it’s just bare text before the intro blockquote, remove the phrase
-              $lead =~ s@Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res(?:\s*[:\.])?\s*(?=\s*<blockquote\b)@@ig;
-
-              # 4) Clean up any now-empty <p> tags
+              # Drop a <p>…</p> that (ignoring inline tags) contains "Table de(s) matières"
+              $lead =~ s@<p\b[^>]*>(?:(?!</p>).)*?Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res(?:(?!</p>).)*?</p>\s*@@ig;
+              # If it’s bare text before the intro blockquote, remove the phrase there too
+              $lead =~ s@Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res\s*(?=\s*<blockquote\b)@@ig;
+              # Clean up any now-empty <p>
               $lead =~ s@<p[^>]*>\s*</p>@@ig;
-
-              # Reassemble: keep the collapsible ToC first, then the cleaned front matter
-              $toc . $lead
+              $lead
             }eis
           ' "$html"
 
