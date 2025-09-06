@@ -145,36 +145,6 @@ jobs:
           perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
           echo "After wrapper swap:"; grep -n 'assets/images/annex-' "$html" || true
 
-      # Step B: if any still missing, anchor by the visible headings and prune text
-      - name: Anchor by headings & prune text (fallback)
-        shell: bash
-        run: |
-          set -euo pipefail
-          html="dist/index.html"
-
-          place_after_heading () {
-            pat="$1"; img="$2"; alt="$3"
-            # If image absent, insert right after heading and remove body until next heading or </section>
-            grep -q "$img" "$html" && return 0
-            perl -0777 -i -pe "s{
-              (<(?:h[1-6]|p)[^>]*>.*?${pat}.*?</(?:h[1-6]|p)>)
-              (?s).*?
-              (?=(?:<h[1-6]|</section>))
-            }{\\1\n<figure class=\\\"annex-figure\\\"><img src=\\\"${img}\\\" alt=\\\"${alt}\\\"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>\n}igx" "$html" || true
-          }
-
-          # Title → TOC → Notes (this order guarantees the final order)
-          place_after_heading "Mod(?:[èe]le)?\\s+de\\s+page\\s+titre" \
-            "assets/images/annex-title.png" "Modèle de page titre (image)"
-
-          place_after_heading "Mod(?:[èe]le)?\\s+de\\s+table\\s+des\\s+mati(?:[èe]res)" \
-            "assets/images/annex-toc.png" "Modèle de table des matières (image)"
-
-          place_after_heading "Exemple\\s+de\\s+texte\\s+avec\\s+appels\\s+de\\s+notes.*citations" \
-            "assets/images/annex-notes.png" "Exemple de texte avec appels de notes et citations (image)"
-
-          echo "After heading fallback:"; grep -n 'assets/images/annex-' "$html" || true
-
 # Final, authoritative placement: replace Annexes body with 3 figures in order
       - name: Replace Annexes content with ordered figures
         shell: bash
