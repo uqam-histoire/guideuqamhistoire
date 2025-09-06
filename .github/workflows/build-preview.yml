@@ -110,34 +110,30 @@ jobs:
             }eis
           ' "$html"
 
-      # 1) Supprimer UNIQUEMENT la ligne orpheline « Table des matières » dans le front-matter
       - name: Remove orphan “Table des matières” line (front matter only, surgical)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
-          # On ne normalise PAS globalement les espaces : on matche à la fois espaces et NBSP
+          # Work only on the part BEFORE the first H1 (front matter)
           perl -0777 -i -pe '
-            s{\A(.*?)(?=<h1\b)}{
-              my $lead = $1;  # tout ce qui précède le 1er H1 (titre, label, intro)
+           s{\A(.*?)(?=<h1\b)}{
+              my $lead = $1;
 
-              # (A) Si la ligne est dans un <p>…</p> (avec ou sans <strong>/<em>/span>)
-              $lead =~ s@
-                <p\b[^>]*>
-                (?:(?!</p>).)*?
-                Table(?:\s|&nbsp;|\x{A0})+de(?:s)?(?:\s|&nbsp;|\x{A0})+mati(?:&egrave;|&#232;|[eèÈ])res
-                (?:(?!</p>).)*?
-                </p>\s*
-              @@igx;
+              # Matches "Table de(s) matières" with spaces or NBSPs and with è as unicode or HTML entity
+              my $tm = qr/
+                Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+
+                mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res
+              /ix;
 
-              # (B) Si c’est une ligne « nue » avant le bloc d’intro (blockquote), avec balises inline facultatives
-              $lead =~ s@
-                (?:^|\n)\s*
-                (?:<(?:strong|b|em|i|span)[^>]*>)*
-                Table(?:\s|&nbsp;|\x{A0})+de(?:s)?(?:\s|&nbsp;|\x{A0})+mati(?:&egrave;|&#232;|[eèÈ])res(?:\s*[:\.])?
-                (?:</(?:strong|b|em|i|span)>\s*)*
-                \s*(?=\n|<blockquote\b)
-              @@igx;
+              # (A) If the phrase is inside a paragraph (allow inline tags inside the <p>)
+              $lead =~ s@<p\b[^>]*>(?:(?!</p>).)*?$tm(?:(?!</p>).)*?</p>\s*@@ig;
+
+              # (B) If the phrase appears as bare text just before the intro blockquote
+              $lead =~ s@$tm\s*(?=\s*<blockquote\b)@@ig;
+
+              # Cleanup: drop empty paragraphs created by the removal
+              $lead =~ s@<p[^>]*>\s*</p>@@ig;
 
               $lead
             }eis
