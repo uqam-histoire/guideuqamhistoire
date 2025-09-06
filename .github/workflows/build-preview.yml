@@ -110,20 +110,29 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove stray Table des matières paragraph (front matter)
+      - name: Remove orphan “Table des matières” line (front matter only)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
+
+          # Normalize both entity and Unicode NBSP so matching is reliable
+          perl -0777 -i -pe 's/(?:&nbsp;|\x{00A0})/ /g' "$html"
+
+          # Work only on the chunk BEFORE the first H1
           perl -0777 -i -pe '
             s{\A(.*?)(?=<h1\b)}{
-              my $lead = $1; $lead =~ s/&nbsp;/ /g;
-              # Drop a <p>…</p> that (ignoring inline tags) contains "Table de(s) matières"
-              $lead =~ s@<p\b[^>]*>(?:(?!</p>).)*?Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res(?:(?!</p>).)*?</p>\s*@@ig;
-              # If it’s bare text before the intro blockquote, remove the phrase there too
+              my $lead = $1;
+
+              # 1) Remove a <p>…</p> that contains "Table de(s) matières" (allow any inline tags/newlines)
+              $lead =~ s@<p\b[^>]*>[\s\S]*?Table\s+de(?:s)?\s+mati[\s\S]*?</p>\s*@@ig;
+
+              # 2) If it’s bare text (possibly with inline tags), strip the phrase itself before the intro blockquote
               $lead =~ s@Table\s+de(?:s)?\s+mati(?:&egrave;|&#232;|[eè])res\s*(?=\s*<blockquote\b)@@ig;
-              # Clean up any now-empty <p>
+
+              # 3) Remove any now-empty paragraphs created by the above
               $lead =~ s@<p[^>]*>\s*</p>@@ig;
+
               $lead
             }eis
           ' "$html"
