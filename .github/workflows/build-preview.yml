@@ -201,8 +201,6 @@ jobs:
             }
           ' "$html"
 
-
-
       - name: Remove stray Annex III footnotes (4 & 5)
         shell: bash
         run: |
