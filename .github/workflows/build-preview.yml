@@ -149,13 +149,13 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Rename Sommaire to “Table des Matières”
+      - name: Rename Sommaire to “Table des matières”
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
           # Replace whatever is between <summary>…</summary> in the details.toc block
-          perl -0777 -i -pe 's@(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>\s*<summary[^>]*>)(.*?)(</summary>)@$1Table des Matières$3@is' "$html"
+          perl -0777 -i -pe 's@(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>\s*<summary[^>]*>)(.*?)(</summary>)@$1Table des matières$3@is' "$html"
 
       - name: Inject preview-only ToC styles (links + indent)
         shell: bash
