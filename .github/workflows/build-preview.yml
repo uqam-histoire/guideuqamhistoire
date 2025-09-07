@@ -95,6 +95,22 @@ jobs:
             --css=assets/uqam-guide.css \
             -o dist/index.html
 
+      - name: Rename topbar “Sommaire” button → “T. de M.”
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # Add a helpful tooltip (title) to the ToC button if missing
+          perl -0777 -i -pe 's@(<a\b[^>]*href="#toc")(?![^>]*\btitle=)([^>]*>)@$1 title="Table des matières"$2@i' "$html"
+
+          # Replace the link text with a non-breaking version: T.&nbsp;de&nbsp;M.
+          perl -0777 -i -pe 's@(<a\b[^>]*href="#toc"[^>]*>)[\s\S]*?(</a>)@$1T.&nbsp;de&nbsp;M.$2@i' "$html"
+
+          # Sanity check
+          grep -n 'href="#toc"' "$html" | head -1
+
+
       - name: Hide Word-generated Table des matières (front matter only)
         shell: bash
         run: |
