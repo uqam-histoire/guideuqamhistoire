@@ -2,7 +2,7 @@ name: Build & publish undergraduate guide
 
 on:
   push:
-    branches: [ main ]
+    branches: [ staging ]
     paths:
       - "Guide_1er_cycle_2025_VF.docx"
       - "assets/**"
@@ -281,10 +281,11 @@ jobs:
           # Debug: print remaining matches (should be empty)
           grep -n -i '<strong>[^<]*table[^<]*mati' "$html" || true
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy PREVIEW to GitHub Pages (under /preview)
         uses: peaceiris/actions-gh-pages@v4
         with:
           publish_dir: dist
           publish_branch: gh-pages
+          destination_dir: preview
           keep_files: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
