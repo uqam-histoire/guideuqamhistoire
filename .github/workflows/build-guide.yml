@@ -1,0 +1,285 @@
+name: Build & publish undergraduate guide
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "Guide_1er_cycle_2025_VF.docx"
+      - "assets/**"
+      - ".github/workflows/build-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install converters & fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice pandoc fontconfig software-properties-common
+          sudo add-apt-repository multiverse -y
+          sudo apt-get update
+          echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
+          sudo apt-get install -y ttf-mscorefonts-installer
+          sudo fc-cache -f -v
+          fc-list | grep -i "Times New Roman" || true
+
+      - name: Prepare dist and copy assets
+        run: |
+          set -e
+          mkdir -p dist/assets/images
+          cp assets/*.css dist/assets/ 2>/dev/null || true
+          cp assets/images/* dist/assets/images/ 2>/dev/null || true
+          echo "Published assets:"; ls -la dist/assets || true
+          echo "Published images:"; ls -la dist/assets/images || true
+
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
+
+      - name: Convert DOCX to PDF
+        run: |
+          libreoffice --headless \
+            --convert-to "pdf:writer_pdf_Export:EmbedStandardFonts=true;ExportBookmarks=true;SelectPdfVersion=1;IsSkipEmptyPages=true" \
+            "Guide_1er_cycle_2025_VF.docx" \
+            --outdir dist
+
+
+      - name: Install exiftool
+        run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
+      - name: Install qpdf & poppler-utils
+        run: sudo apt-get update && sudo apt-get install -y qpdf poppler-utils
+
+      - name: Set PDF metadata
+        env:
+          PDF_TITLE: "Guide du programme d'histoire – UQAM"
+          PDF_AUTHOR: "Département d’histoire, UQAM"
+          PDF_SUBJECT: "Guide du 1er cycle (B.A., majeure, mineures, certificats)"
+        run: |
+          exiftool -overwrite_original \
+            -Title="$PDF_TITLE" -Author="$PDF_AUTHOR" -Subject="$PDF_SUBJECT" \
+            -Keywords="UQAM, Histoire, Premier cycle, Guide" \
+            dist/Guide_1er_cycle_2025_VF.pdf
+          exiftool -Title -Author -Subject dist/Guide_1er_cycle_2025_VF.pdf || true
+
+      - name: Drop blank page 3 if empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          pdf="dist/Guide_1er_cycle_2025_VF.pdf"
+
+          # Extract text from page 3; if there's none (only whitespace), drop page 3.
+          if [ "$(pdftotext -f 3 -l 3 "$pdf" - | tr -d '\f\r\n[:space:]' | wc -c)" -eq 0 ]; then
+            # Reassemble without page 3: 1-2,4..end
+            qpdf --empty --pages "$pdf" 1-2,4-z -- "${pdf%.pdf}.tmp.pdf"
+            mv -f "${pdf%.pdf}.tmp.pdf" "$pdf"
+            echo "Removed blank page 3."
+          else
+            echo "Page 3 not empty; leaving PDF unchanged."
+          fi
+
+      - name: Convert DOCX to HTML (Pandoc)
+        run: |
+          pandoc "Guide_1er_cycle_2025_VF.docx" \
+            -s -t html5 --section-divs \
+            --lua-filter=./assets/section-tagger.lua \
+            --template=assets/pandoc.html5 \
+            --metadata title="Guide à l’intention des étudiants et des étudiantes de premier cycle en histoire et en archivistique" \
+            --metadata lang=fr --metadata date="${BUILD_DATE}" \
+            --toc --toc-depth=4 --number-sections \
+            --css=assets/uqam-guide.css \
+            -o dist/index.html
+
+      - name: Rename topbar “Sommaire” button → “T. de M.”
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # Add a helpful tooltip (title) to the ToC button if missing
+          perl -0777 -i -pe 's@(<a\b[^>]*href="#toc")(?![^>]*\btitle=)([^>]*>)@$1 title="Table des matières"$2@i' "$html"
+
+          # Replace the link text with a non-breaking version: T.&nbsp;de&nbsp;M.
+          perl -0777 -i -pe 's@(<a\b[^>]*href="#toc"[^>]*>)[\s\S]*?(</a>)@$1T.&nbsp;de&nbsp;M.$2@i' "$html"
+
+          # Sanity check
+          grep -n 'href="#toc"' "$html" | head -1
+
+
+      - name: Hide Word-generated Table des matières (front matter only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          perl -0777 -i -pe '
+            s{\A(.*?)(?=<h1\b)}{
+              my $lead = $1;
+              $lead =~ s/&nbsp;/ /g;  # normalize NBSP
+              # remove any block of 5+ consecutive numbered <p> (1, 1.2, 2.3.1, …)
+              $lead =~ s{(?:\s*<p\b[^>]*>\s*(?:<[^>]+>\s*)*\d+(?:\.\d+)*[\s\S]*?</p>){5,}}{}isg;
+              $lead
+            }eis
+          ' "$html"
+
+      - name: Remove orphan Table des matières paragraph (pre-intro block only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # Delete any <p>…</p> that contains "Table de(s) matières" before the first <blockquote>
+          perl -0777 -i -pe '
+            s{\A(.*?<blockquote\b)}{
+              my $pre = $1;                        # everything up to the intro blockquote
+              # Kill a paragraph whose content includes "Table de(s) matières" (accent/entity/NBSP tolerant)
+              $pre =~ s@
+                <p\b[^>]*>                         # opening <p>
+                [\s\S]*?
+                Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+
+                mati(?:&egrave;|&#0*232;|[\x{00E8}\x{00C8}e])res
+                [\s\S]*?
+                </p>\s*                            # closing </p>
+              @@ig;
+              $pre
+            }eis
+          ' "$html"
+
+      - name: Rename Sommaire to “Table des Matières”
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          # Replace whatever is between <summary>…</summary> in the details.toc block
+          perl -0777 -i -pe 's@(<details[^>]*\bclass="[^"]*\btoc\b[^"]*"[^>]*>\s*<summary[^>]*>)(.*?)(</summary>)@$1Table des Matières$3@is' "$html"
+
+      - name: Inject preview-only ToC styles (links + indent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          # Inline CSS (safe & cache-proof for preview)
+          perl -0777 -i -pe 's@</head>@<style>
+            details.toc{ margin:.75rem 0 1.25rem; border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#fafbfc; }
+            details.toc summary{ cursor:pointer; font-weight:600; color:var(--uqam-blue); }
+            details.toc ul{ list-style:none; padding-left:.5rem; margin:0; }
+            details.toc li{ margin:.15rem 0; }
+            details.toc li li{ padding-left:1rem; }
+            details.toc li li li{ padding-left:1.6rem; }
+            details.toc li li li li{ padding-left:2.2rem; }
+            details.toc a{ display:block; padding:.2rem .3rem; border-radius:.25rem; text-decoration:none; color:var(--uqam-blue); }
+            details.toc a:hover{ background:#f6f8fa; text-decoration:underline; }
+            </style></head>@i' "$html"
+
+      # Step A: simple wrapper-to-figure replacement (fast path)
+      - name: Swap Annex wrappers for figures (fast path)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btitle-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\btoc-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-toc.png" alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          perl -0777 -i -pe 's|<div[^>]*class="[^"]*\bnotes-mock\b"[^>]*>.*?</div>|<figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>|gs' "$html" || true
+          echo "After wrapper swap:"; grep -n 'assets/images/annex-' "$html" || true
+
+      # Final, authoritative placement: replace Annexes body with 3 figures in order
+      - name: Replace Annexes content with ordered figures (by heading text)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+          perl -0777 -i -pe 's/&nbsp;/ /g' "$html"
+
+          perl -0777 -i -pe '
+            my $figs = qq{
+            <figure class="annex-figure"><img src="assets/images/annex-title.png" alt="Modèle de page titre (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
+            <figure class="annex-figure"><img src="assets/images/annex-toc.png"   alt="Modèle de table des matières (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>
+            <figure class="annex-figure"><img src="assets/images/annex-notes.png" alt="Exemple de texte avec appels de notes et citations (image)"><figcaption>Voir le PDF pour la version imprimable</figcaption></figure>};
+
+            # Try: section with id containing "annex"
+            if (!s{
+                  ( <section[^>]*\bid="[^"]*annex[^"]*"[^>]*> \s*
+                    <h[1-6][^>]*> [\s\S]*? Annexes [\s\S]*? </h[1-6]> )
+                  [\s\S]*?
+                  ( </section> )
+                }{$1\n$figs\n$2}igx)
+            {
+              # Fallback: match by heading text only
+              s{
+                ( <section[^>]*> \s* <h[1-6][^>]*> [\s\S]*? Annexes [\s\S]*? </h[1-6]> )
+                [\s\S]*?
+                ( </section> )
+              }{$1\n$figs\n$2}igx;
+            }
+          ' "$html"
+
+      - name: Remove stray Annex III footnotes (4 & 5)
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # 1) Remove by id if numbers are stable
+          perl -0777 -i -pe 's#\s*<li id="fn4">.*?</li>\s*##gs' "$html" || true
+          perl -0777 -i -pe 's#\s*<li id="fn5">.*?</li>\s*##gs' "$html" || true
+
+          # 2) Also remove by content (in case numbering shifts later)
+          perl -0777 -i -pe 's#\s*<li id="fn\d+">(?:(?:(?!</li>).)*?(Louis\s+Buade\s+de\s+Frontenac|Jean[-\s]?Baptiste\s+Colbert).+?)</li>\s*##gs' "$html" || true
+
+          # 3) Sanity check
+          echo "Remaining footnotes:"
+          grep -n '<li id="fn' "$html" || true
+
+      - name: Verify ToC removed and Annex images present
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # Fail if a Word-style ToC (≥5 numbered paragraphs) still exists BEFORE the first H1
+          if perl -0777 -ne '
+               if (m/\A(.*?)(?=<h1\b)/is) {
+                 my $lead=$1; $lead =~ s/&nbsp;/ /g;
+                 if ($lead =~ /(?:\s*<p\b[^>]*>\s*(?:<[^>]+>\s*)*\d+(?:\.\d+)*[\s\S]*?<\/p>){5,}/i) { exit 9 }
+               }
+             ' "$html"; then :; else
+             code=$?; if [ "$code" -eq 9 ]; then
+               echo "::error::Front-matter ToC still present (numbered block)"; exit 1;
+             fi
+          fi
+
+          # Each Annex mock image should appear exactly once in the HTML and exist on disk
+          for img in annex-title.png annex-toc.png annex-notes.png; do
+            refs=$(grep -c "assets/images/$img" "$html" || true)
+            if [ "$refs" -ne 1 ]; then
+              echo "::error::Expected 1 reference to $img, found $refs"; exit 1;
+            fi
+            test -f "dist/assets/images/$img" || { echo "::error::dist/assets/images/$img missing"; exit 1; }
+          done
+
+      - name: Final sweep drop the orphan TOC line (sed, UTF-8)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LANG=C.UTF-8 LC_ALL=C.UTF-8
+          html="dist/index.html"
+
+          # Kill the exact paragraph; allow optional leading/trailing spaces on the line
+          sed -i -e '/^[[:space:]]*<p><strong>Table des matières<\/strong><\/p>[[:space:]]*$/d' "$html"
+          # Also kill a capital-M variant, just in case
+          sed -i -e '/^[[:space:]]*<p><strong>Table des Matières<\/strong><\/p>[[:space:]]*$/d' "$html"
+
+          # Debug: print remaining matches (should be empty)
+          grep -n -i '<strong>[^<]*table[^<]*mati' "$html" || true
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_dir: dist
+          publish_branch: gh-pages
+          keep_files: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
