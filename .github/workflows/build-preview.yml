@@ -110,7 +110,7 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove orphan “Table des matières” line (front matter only, surgical)
+      - name: Remove stray <strong>Table des matières</strong> (front matter only)
         shell: bash
         run: |
           set -euo pipefail
@@ -118,19 +118,8 @@ jobs:
           perl -0777 -i -pe '
             s{\A(.*?)(?=<h1\b)}{
               my $lead = $1;
-
-              # Phrase matcher: "Table de(s) matières" with normal/NBSP spaces and è variants
-              my $tm = qr/Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res/i;
-
-              # (A) Drop a paragraph that contains that phrase (allow inline tags inside <p>…</p>)
-              $lead =~ s@<p\b[^>]*>(?:(?!</p>).)*?$tm(?:(?!</p>).)*?</p>\s*@@ig;
-
-              # (B) If it’s bare text just before the intro blockquote, remove the phrase there too
-              $lead =~ s@$tm\s*(?=\s*<blockquote\b)@@ig;
-
-              # Cleanup: remove any now-empty <p>…</p>
-              $lead =~ s@<p[^>]*>\s*</p>@@ig;
-
+              $lead =~ s@<strong\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res\s*</strong>\s*@@ig;
+              $lead =~ s@<b\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res\s*</b>\s*@@ig;
               $lead
             }eis
           ' "$html"
