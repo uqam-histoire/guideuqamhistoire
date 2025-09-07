@@ -110,22 +110,47 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove orphan Table des matières paragraph/strong (global, safe)
+      - name: Remove orphan Table des matières label (paragraph or strong, globally but surgical)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
 
-          # 1) Remove <p><strong>Table des matières</strong></p> (allow NBSPs, accent/unaccent)
-          perl -0777 -i -pe 's@<p\b[^>]*>\s*<(?:strong|b)\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[eè])res\s*</(?:strong|b)>\s*</p>\s*@@ig' "$html"
+          # 1) Drop any <p>…</p> whose inner text is exactly "table de(s) matières" (accents/NBSP tolerated)
+          perl -0777 -i -pe '
+            s{
+              (<p\b[^>]*> .*? </p>)
+            }{
+              my $p = $1;
+              my $t = $p;
+              $t =~ s/<[^>]+>//g;                     # strip inline tags
+              $t =~ s/(?:&nbsp;|\x{00A0})/ /g;        # NBSP -> space
+              $t =~ s/\s+/ /g; $t =~ s/^\s+|\s+$//g;  # collapse & trim
+              $t = lc $t; $t =~ s/[[:punct:]]+$//;    # lower & strip trailing punctuation
+              ( $t eq "table des matières"
+             or $t eq "table de matières"
+             or $t eq "table des matieres"
+             or $t eq "table de matieres" ) ? "" : $p;
+            }egis;
+          ' "$html"
 
-          # 2) Also remove a standalone <strong>…</strong> line (just in case)
-          perl -0777 -i -pe 's@<(?:strong|b)\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[eè])res\s*</(?:strong|b)>\s*@@ig' "$html"
-
-          # Sanity check (optional): fail if any remains
-          if grep -qi '<strong>[^<]*Table des mati' "$html"; then
-            echo "::error::Stray <strong>Table des matières</strong> still present"; exit 1
-          fi
+          # 2) Also drop a standalone <strong>/<b>…</strong></b> line with exactly that phrase
+          perl -0777 -i -pe '
+            s{
+              (<(?:strong|b)\b[^>]*> .*? </(?:strong|b)>\s*)
+            }{
+              my $s = $1;
+              my $t = $s;
+              $t =~ s/<[^>]+>//g;
+              $t =~ s/(?:&nbsp;|\x{00A0})/ /g;
+              $t =~ s/\s+/ /g; $t =~ s/^\s+|\s+$//g;
+              $t = lc $t; $t =~ s/[[:punct:]]+$//;
+              ( $t eq "table des matières"
+             or $t eq "table de matières"
+             or $t eq "table des matieres"
+             or $t eq "table de matieres" ) ? "" : $s;
+            }egis;
+          ' "$html"
 
       - name: Rename Sommaire to “Table des Matières”
         shell: bash
