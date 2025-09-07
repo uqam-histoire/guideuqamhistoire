@@ -118,8 +118,8 @@ jobs:
           perl -0777 -i -pe '
             s{\A(.*?)(?=<h1\b)}{
               my $lead = $1;
-              $lead =~ s@<strong\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res\s*</strong>\s*@@ig;
-              $lead =~ s@<b\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}e])res\s*</b>\s*@@ig;
+              # Remove exactly: <p><strong>Table des matières</strong></p> (allowing NBSP & accent variants)
+              $lead =~ s@<p\b[^>]*>\s*<strong\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}]|e)res\s*</strong>\s*</p>\s*@@ig;
               $lead
             }eis
           ' "$html"
