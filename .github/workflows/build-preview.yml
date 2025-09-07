@@ -110,7 +110,7 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove stray <strong>Table des matières</strong> (front matter only)
+      - name: Remove orphan Table des matières <p> (front matter, exact match)
         shell: bash
         run: |
           set -euo pipefail
@@ -118,8 +118,22 @@ jobs:
           perl -0777 -i -pe '
             s{\A(.*?)(?=<h1\b)}{
               my $lead = $1;
-              # Remove exactly: <p><strong>Table des matières</strong></p> (allowing NBSP & accent variants)
-              $lead =~ s@<p\b[^>]*>\s*<strong\b[^>]*>\s*Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati(?:&egrave;|&#232;|[\x{00E8}\x{00C8}]|e)res\s*</strong>\s*</p>\s*@@ig;
+
+              # For each <p>…</p> in the front matter, drop it only if its text is exactly "table des matières"
+              $lead =~ s{
+                (<p\b[^>]*> .*? </p>)
+              }{
+                my $p = $1;
+                my $txt = $p;
+                $txt =~ s/<[^>]+>//g;                 # strip inline tags
+                $txt =~ s/(?:\x{00A0}|&nbsp;)/ /g;    # NBSP -> space
+                $txt =~ s/\s+/ /g;                    # collapse spaces
+                $txt =~ s/^\s+|\s+$//g;               # trim
+                my $low = lc $txt;
+                ($low eq "table des matières" || $low eq "table de matières" || $low eq "table des matieres" || $low eq "table de matieres")
+                  ? "" : $p;
+              }egis;
+
               $lead
             }eis
           ' "$html"
