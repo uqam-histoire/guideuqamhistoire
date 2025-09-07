@@ -110,41 +110,28 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove orphan Table des matières <p> (front matter, exact match w/ normalisation)
+      - name: Remove orphan Table des matières paragraph (pre-intro block only)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
+
+          # Delete any <p>…</p> that contains "Table de(s) matières" before the first <blockquote>
           perl -0777 -i -pe '
-            s{\A(.*?)(?=<h1\b)}{
-              my $lead = $1;
-
-              # Replace each <p>…</p> ONLY if its text == "table de(s) matières"
-              $lead =~ s{
-                (<p\b[^>]*> .*? </p>)
-              }{
-                my $p = $1;
-                my $t = $p;
-
-                # Strip inline tags, normalise whitespace & accents
-                $t =~ s/<[^>]+>//g;                        # remove tags
-                $t =~ s/(?:&nbsp;|\x{00A0})/ /g;           # NBSP -> space
-                $t =~ s/&(?:egrave|Egrave);/e/g;           # &egrave; -> e
-                $t =~ s/&#0*232;?/e/g;                     # &#232; -> e
-                $t =~ s/[\x{0300}-\x{036F}]//g;            # drop combining marks
-                $t =~ s/[\x{00E8}\x{00C8}]/e/g;            # è/È -> e
-                $t = lc $t;                                # case-insensitive compare
-                $t =~ s/^\s+|\s+$//g;                      # trim
-                $t =~ s/\s+/ /g;                           # collapse spaces
-                $t =~ s/[[:punct:]]+$//;                   # drop trailing punctuation
-
-                ($t eq "table des matieres" or $t eq "table de matieres") ? "" : $p;
-              }egis;
-
-              $lead
+            s{\A(.*?<blockquote\b)}{
+              my $pre = $1;                        # everything up to the intro blockquote
+              # Kill a paragraph whose content includes "Table de(s) matières" (accent/entity/NBSP tolerant)
+              $pre =~ s@
+                <p\b[^>]*>                         # opening <p>
+                [\s\S]*?
+                Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+
+                mati(?:&egrave;|&#0*232;|[\x{00E8}\x{00C8}e])res
+                [\s\S]*?
+                </p>\s*                            # closing </p>
+              @@ig;
+              $pre
             }eis
           ' "$html"
-
 
       - name: Rename Sommaire to “Table des Matières”
         shell: bash
