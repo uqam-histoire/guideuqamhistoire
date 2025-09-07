@@ -247,6 +247,28 @@ jobs:
             test -f "dist/assets/images/$img" || { echo "::error::dist/assets/images/$img missing"; exit 1; }
           done
 
+      - name: Final sweep remove orphan Table des matières paragraph
+        shell: bash
+        run: |
+          set -euo pipefail
+          html="dist/index.html"
+
+          # Delete the first <p><strong>Table des matières</strong></p> we see (very specific; accent/narrow NBSP tolerant)
+          perl -0777 -i -pe '
+            our $k //= 0;
+            if (!$k) {
+              $k = s@
+                <p>\s*<(?:strong|b)\b[^>]*>\s*
+                Table(?:\s|&nbsp;|\x{00A0})+de(?:s)?(?:\s|&nbsp;|\x{00A0})+mati[^<]{0,8}res
+                \s*</(?:strong|b)>\s*</p>\s*
+              @@i;
+            }
+          ' "$html"
+
+          # Quick check: show any remaining strong-Table lines (should be empty)
+          grep -n -i '<strong>[^<]*table[^<]*mati' "$html" || true
+
+
       - name: Deploy PREVIEW to GitHub Pages (under /preview)
         uses: peaceiris/actions-gh-pages@v4
         with:
