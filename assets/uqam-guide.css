@@ -45,7 +45,7 @@ blockquote{border-left:4px solid #cfd9e3; margin:1rem 0; padding:.5rem 1rem; bac
 
 /* ===== Header bar (if present in template) ===== */
 .topbar{display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.5rem 0; margin-bottom:.5rem;}
-.badge-mobile{display:inline-block; padding:.15rem .5rem; border-radius:999px; background:var(--uqam-blue); color:#fff; font-size:.75rem;}
+.badge-mobile{display:inline-flex; align-items:center; justify-content:center; padding:.15rem .5rem; border-radius:999px; background:var(--uqam-blue); color:#fff; font-size:.75rem; white-space:nowrap; text-align:center; line-height:1; hyphens:none; word-break:normal; flex-shrink:0;}
 .doc-actions .btn{display:inline-block; padding:.45rem .7rem; border-radius:.5rem; border:1px solid #cfd9e3; background:#f6f8fa; text-decoration:none; margin-left:.35rem;}
 
 /* ===== Sommaire (ToC) ===== */
