@@ -110,47 +110,41 @@ jobs:
             }eis
           ' "$html"
 
-      - name: Remove orphan Table des matières label (paragraph or strong, globally but surgical)
+      - name: Remove orphan Table des matières <p> (front matter, exact match w/ normalisation)
         shell: bash
         run: |
           set -euo pipefail
           html="dist/index.html"
-
-          # 1) Drop any <p>…</p> whose inner text is exactly "table de(s) matières" (accents/NBSP tolerated)
           perl -0777 -i -pe '
-            s{
-              (<p\b[^>]*> .*? </p>)
-            }{
-              my $p = $1;
-              my $t = $p;
-              $t =~ s/<[^>]+>//g;                     # strip inline tags
-              $t =~ s/(?:&nbsp;|\x{00A0})/ /g;        # NBSP -> space
-              $t =~ s/\s+/ /g; $t =~ s/^\s+|\s+$//g;  # collapse & trim
-              $t = lc $t; $t =~ s/[[:punct:]]+$//;    # lower & strip trailing punctuation
-              ( $t eq "table des matières"
-             or $t eq "table de matières"
-             or $t eq "table des matieres"
-             or $t eq "table de matieres" ) ? "" : $p;
-            }egis;
+            s{\A(.*?)(?=<h1\b)}{
+              my $lead = $1;
+
+              # Replace each <p>…</p> ONLY if its text == "table de(s) matières"
+              $lead =~ s{
+                (<p\b[^>]*> .*? </p>)
+              }{
+                my $p = $1;
+                my $t = $p;
+
+                # Strip inline tags, normalise whitespace & accents
+                $t =~ s/<[^>]+>//g;                        # remove tags
+                $t =~ s/(?:&nbsp;|\x{00A0})/ /g;           # NBSP -> space
+                $t =~ s/&(?:egrave|Egrave);/e/g;           # &egrave; -> e
+                $t =~ s/&#0*232;?/e/g;                     # &#232; -> e
+                $t =~ s/[\x{0300}-\x{036F}]//g;            # drop combining marks
+                $t =~ s/[\x{00E8}\x{00C8}]/e/g;            # è/È -> e
+                $t = lc $t;                                # case-insensitive compare
+                $t =~ s/^\s+|\s+$//g;                      # trim
+                $t =~ s/\s+/ /g;                           # collapse spaces
+                $t =~ s/[[:punct:]]+$//;                   # drop trailing punctuation
+
+                ($t eq "table des matieres" or $t eq "table de matieres") ? "" : $p;
+              }egis;
+
+              $lead
+            }eis
           ' "$html"
 
-          # 2) Also drop a standalone <strong>/<b>…</strong></b> line with exactly that phrase
-          perl -0777 -i -pe '
-            s{
-              (<(?:strong|b)\b[^>]*> .*? </(?:strong|b)>\s*)
-            }{
-              my $s = $1;
-              my $t = $s;
-              $t =~ s/<[^>]+>//g;
-              $t =~ s/(?:&nbsp;|\x{00A0})/ /g;
-              $t =~ s/\s+/ /g; $t =~ s/^\s+|\s+$//g;
-              $t = lc $t; $t =~ s/[[:punct:]]+$//;
-              ( $t eq "table des matières"
-             or $t eq "table de matières"
-             or $t eq "table des matieres"
-             or $t eq "table de matieres" ) ? "" : $s;
-            }egis;
-          ' "$html"
 
       - name: Rename Sommaire to “Table des Matières”
         shell: bash
