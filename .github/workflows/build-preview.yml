@@ -247,22 +247,19 @@ jobs:
             test -f "dist/assets/images/$img" || { echo "::error::dist/assets/images/$img missing"; exit 1; }
           done
 
-      - name: Final, literal removal of the orphan Table des matières paragraph
+      - name: Final sweep drop the orphan TOC line (sed, UTF-8)
         shell: bash
         run: |
           set -euo pipefail
+          export LANG=C.UTF-8 LC_ALL=C.UTF-8
           html="dist/index.html"
 
-          # Use Unicode-aware IO so the literal 'è' matches exactly
-          perl -CS -0777 -i -pe '
-            BEGIN { binmode(STDIN,":encoding(UTF-8)"); binmode(STDOUT,":encoding(UTF-8)"); }
-            # remove lower-case m version
-            s/\Q<p><strong>Table des matières</strong></p>\E\s*//s;
-            # remove capital-M version (just in case)
-            s/\Q<p><strong>Table des Matières</strong></p>\E\s*//s;
-          ' "$html"
+          # Kill the exact paragraph; allow optional leading/trailing spaces on the line
+          sed -i -e '/^[[:space:]]*<p><strong>Table des matières<\/strong><\/p>[[:space:]]*$/d' "$html"
+          # Also kill a capital-M variant, just in case
+          sed -i -e '/^[[:space:]]*<p><strong>Table des Matières<\/strong><\/p>[[:space:]]*$/d' "$html"
 
-          # Optional: show if any <strong>…Table…mati…</strong> still remains (should print nothing)
+          # Debug: print remaining matches (should be empty)
           grep -n -i '<strong>[^<]*table[^<]*mati' "$html" || true
 
       - name: Deploy PREVIEW to GitHub Pages (under /preview)
