@@ -10,7 +10,7 @@ Watch Actions
 
 Check:
 
-/preview/
+[/preview/](https://uqam-histoire.github.io/guideuqamhistoire/preview/)
 
 preview PDF
 
