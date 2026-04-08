@@ -1,3 +1,22 @@
+Super brief guide to updating:
+
+Switch to staging
+
+Upload new Guide_1er_cycle_2025_VF.docx
+
+Commit to staging
+
+Watch Actions
+
+Check:
+
+[/preview/](https://uqam-histoire.github.io/guideuqamhistoire/preview/)
+
+preview PDF
+
+If good, make PR staging → main
+
+
 # README – Guide étudiant du Département d’histoire (UQAM)
 Préparé par R.M. Pollard (30-3-2026)
 
